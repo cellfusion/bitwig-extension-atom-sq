@@ -1,16 +1,21 @@
 package jp.cellfusion.bitwig.extension;
 
 import com.bitwig.extension.api.Color;
-import com.bitwig.extension.controller.api.*;
 import com.bitwig.extension.controller.ControllerExtension;
+import com.bitwig.extension.controller.api.*;
 import com.bitwig.extensions.framework.DebugUtilities;
 import com.bitwig.extensions.framework.Layer;
 import com.bitwig.extensions.framework.Layers;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Consumer;
 
 public class AtomSQExtension extends ControllerExtension
 {
    private final static int CC_ENCODER_1 = 0x0E;
    private final static int CC_ALPHABET_1 = 0x18;
+   private final static int CC_PAD_1 = 0x24;
    private final static int CC_STOP_UNDO = 0x6F;
    private final static int CC_PLAY_LOOP_TOGGLE = 0x6D;
    private final static int CC_RECORD_SAVE = 0x6B;
@@ -23,6 +28,7 @@ public class AtomSQExtension extends ControllerExtension
    private final static int CC_RIGHT = 0x66;
 
    private final static int ENCODER_NUM = 8;
+   private final static int PAD_NUM = 32;
 
    private static final Color WHITE = Color.fromRGB(1, 1, 1);
 
@@ -37,6 +43,7 @@ public class AtomSQExtension extends ControllerExtension
    private static final Color ORANGE = Color.fromRGB(1, 1, 0);
 
    private static final Color BLUE = Color.fromRGB(0, 0, 1);
+   private static final int LAUNCHER_SCENES = 16;
 
    private CursorTrack mCursorTrack;
    private PinnableCursorDevice mCursorDevice;
@@ -47,6 +54,9 @@ public class AtomSQExtension extends ControllerExtension
    private HardwareButton mShiftButton, mUpButton, mDownButton, mLeftButton, mRightButton, mClickCountInButton, mRecordSaveButton, mPlayLoopButton, mStopUndoButton;
 
    private final RelativeHardwareKnob[] mEncoders = new RelativeHardwareKnob[ENCODER_NUM];
+   private final HardwareButton[] mPadButtons = new HardwareButton[PAD_NUM];
+
+   private final MultiStateHardwareLight[] mPadLights = new MultiStateHardwareLight[PAD_NUM];
 
    private final Layers mLayers = new Layers(this)
    {
@@ -61,6 +71,15 @@ public class AtomSQExtension extends ControllerExtension
    private Layer mBaseLayer;
    private boolean mShift;
    private Transport mTransport;
+   private NoteInput mNoteInput;
+   private PlayingNote[] mPlayingNotes;
+   private DrumPadBank mDrumPadBank;
+   private PinnableCursorClip mCursorClip;
+   private int mPlayingStep;
+   private final int[] mStepData = new int[16];
+   private int mCurrentPadForSteps;
+   private SceneBank mSceneBank;
+
 
    protected AtomSQExtension(final AtomSQExtensionDefinition definition, final ControllerHost host)
    {
@@ -74,11 +93,27 @@ public class AtomSQExtension extends ControllerExtension
       mApplication = host.createApplication();
 
       mMidiIn = host.getMidiInPort(0);
-
       mMidiOut = host.getMidiOutPort(0);
 
-      mCursorTrack = host.createCursorTrack(0, 0);
+      mNoteInput = mMidiIn.createNoteInput("Pads", getNoteInputMask());
+      mNoteInput.setShouldConsumeEvents(true);
+
+      mCursorTrack = host.createCursorTrack(0, LAUNCHER_SCENES);
       mCursorTrack.arm().markInterested();
+      mSceneBank = host.createSceneBank(LAUNCHER_SCENES);
+      for (int s = 0; s < LAUNCHER_SCENES; s++) {
+         final ClipLauncherSlot slot = mCursorTrack.clipLauncherSlotBank().getItemAt(s);
+         slot.color().markInterested();
+         slot.isPlaying().markInterested();
+         slot.isRecording().markInterested();
+         slot.isPlaybackQueued().markInterested();
+         slot.isRecordingQueued().markInterested();
+         slot.hasContent().markInterested();
+
+         final Scene scene = mSceneBank.getScene(s);
+         scene.color().markInterested();
+         scene.exists().markInterested();
+      }
 
       mCursorDevice = mCursorTrack.createCursorDevice("ATOM_SQ", "Atom SQ", 0, CursorDeviceFollowMode.FIRST_INSTRUMENT);
 
@@ -102,6 +137,39 @@ public class AtomSQExtension extends ControllerExtension
       mTransport.isPlaying().markInterested();
       mTransport.getPosition().markInterested();
 
+      mCursorClip = mCursorTrack.createLauncherCursorClip(16, 1);
+      mCursorClip.color().markInterested();
+      mCursorClip.clipLauncherSlot().color().markInterested();
+      mCursorClip.clipLauncherSlot().isPlaying().markInterested();
+      mCursorClip.clipLauncherSlot().isRecording().markInterested();
+      mCursorClip.clipLauncherSlot().isPlaybackQueued().markInterested();
+      mCursorClip.clipLauncherSlot().isRecordingQueued().markInterested();
+      mCursorClip.clipLauncherSlot().hasContent().markInterested();
+      mCursorClip.getLoopLength().markInterested();
+      mCursorClip.getLoopStart().markInterested();
+      mCursorClip.playingStep().addValueObserver(s -> mPlayingStep = s, -1);
+      mCursorClip.scrollToKey(36);
+      mCursorClip.addNoteStepObserver(d -> {
+         final int x = d.x();
+         final int y = d.y();
+
+         if (y == 0 && x >= 0 && x < mStepData.length) {
+            final NoteStep.State state = d.state();
+
+            if (state == NoteStep.State.NoteOn)
+               mStepData[x] = 2;
+            else if (state == NoteStep.State.NoteSustain)
+               mStepData[x] = 1;
+            else
+               mStepData[x] = 0;
+         }
+      });
+      mCursorTrack.playingNotes().addValueObserver(notes -> mPlayingNotes = notes);
+
+      mDrumPadBank = mCursorDevice.createDrumPadBank(PAD_NUM);
+      mDrumPadBank.exists().markInterested();
+
+      mCursorTrack.color().markInterested();
 
       createHardwareSurface();
 
@@ -168,6 +236,13 @@ public class AtomSQExtension extends ControllerExtension
       mStopUndoButton.setLabel("Stop\nUndo");
 
       // Pads
+      for (int i = 0; i < PAD_NUM; i++) {
+         final DrumPad drumPad = mDrumPadBank.getItemAt(i);
+         drumPad.exists().markInterested();
+         drumPad.color().markInterested();
+
+         createPadButton(i);
+      }
 
       // Encoder
       for (int i = 0; i < ENCODER_NUM; i++) {
@@ -236,6 +311,29 @@ public class AtomSQExtension extends ControllerExtension
       return button;
    }
 
+   private void createPadButton(final int index) {
+      final HardwareButton pad = mHardwareSurface.createHardwareButton("pad" + (index + 1));
+      pad.setLabel("Pad " + (index + 1));
+      pad.setLabelColor(BLACK);
+
+      final int note = CC_PAD_1 + index;
+      pad.pressedAction().setPressureActionMatcher(mMidiIn.createNoteOnVelocityValueMatcher(0, note));
+      pad.releasedAction().setActionMatcher(mMidiIn.createNoteOffActionMatcher(0, note));
+
+      mPadButtons[index] = pad;
+
+      final MultiStateHardwareLight light = mHardwareSurface
+              .createMultiStateHardwareLight("pad_light" + (index + 1));
+
+      light.state().onUpdateHardware(new LightStateSender(0x90, CC_PAD_1 + index));
+
+      light.setColorToStateFunction(RGBLightState::new);
+
+      pad.setBackgroundLight(light);
+
+      mPadLights[index] = light;
+   }
+
    private void initLayers()
    {
       mBaseLayer = new Layer(mLayers, "Base");
@@ -280,6 +378,21 @@ public class AtomSQExtension extends ControllerExtension
          mBaseLayer.bind(encoder, parameter);
       }
 
+      // pads
+      for (int i = 0; i < PAD_NUM; i++) {
+         final HardwareButton padButton = mPadButtons[i];
+
+         final int padIndex = i;
+
+         // TODO mode
+         mBaseLayer.bindPressed(padButton, () -> {
+            mCursorClip.scrollToKey(36 + padIndex);
+            mCurrentPadForSteps = padIndex;
+         });
+
+         mBaseLayer.bind(() -> getDrumPadColor(padIndex), padButton);
+      }
+
       mBaseLayer.activate();
    }
 
@@ -292,4 +405,93 @@ public class AtomSQExtension extends ControllerExtension
       }
    }
 
+   private Color getDrumPadColor(final int padIndex) {
+      final DrumPad drumPad = mDrumPadBank.getItemAt(padIndex);
+      final boolean padBankExists = mDrumPadBank.exists().get();
+      final boolean isOn = !padBankExists || drumPad.exists().get();
+
+      if (!isOn)
+         return null;
+
+      final double darken = 0.7;
+
+      Color drumPadColor;
+
+      if (!padBankExists) {
+         drumPadColor = mCursorTrack.color().get();
+      } else {
+         final Color sourceDrumPadColor = drumPad.color().get();
+         final double red = sourceDrumPadColor.getRed() * darken;
+         final double green = sourceDrumPadColor.getGreen() * darken;
+         final double blue = sourceDrumPadColor.getBlue() * darken;
+
+         drumPadColor = Color.fromRGB(red, green, blue);
+      }
+
+      final int playing = velocityForPlayingNote(padIndex);
+
+      if (playing > 0) {
+         return mixColorWithWhite(drumPadColor, playing);
+      }
+
+      return drumPadColor;
+   }
+
+   private int velocityForPlayingNote(final int padIndex) {
+      if (mPlayingNotes != null) {
+         for (final PlayingNote playingNote : mPlayingNotes) {
+            if (playingNote.pitch() == 36 + padIndex) {
+               return playingNote.velocity();
+            }
+         }
+      }
+
+      return 0;
+   }
+
+   private Color mixColorWithWhite(final Color color, final int velocity) {
+      final float x = velocity / 127.f;
+      final double red = color.getRed() * (1 - x) + x;
+      final double green = color.getGreen() * (1 - x) + x;
+      final double blue = color.getBlue() * (1 - x) + x;
+
+      return Color.fromRGB(red, green, blue);
+   }
+
+   private String[] getNoteInputMask() {
+      final List<String> masks = new ArrayList<>();
+      masks.add("80????"); // Note On
+      masks.add("90????"); // Note Off
+      masks.add("D???"); // Channel Pressure
+      return masks.toArray(String[]::new);
+   }
+
+   private class LightStateSender implements Consumer<RGBLightState> {
+      protected LightStateSender(final int statusStart, final int data1) {
+         super();
+         mStatusStart = statusStart;
+         mData1 = data1;
+      }
+
+      @Override
+      public void accept(final RGBLightState state) {
+         mValues[0] = state != null ? (state.isOn() ? 127 : 0) : 0;
+         mValues[1] = state != null ? state.getRed() : 0;
+         mValues[2] = state != null ? state.getGreen() : 0;
+         mValues[3] = state != null ? state.getBlue() : 0;
+
+         for (int i = 0; i < 4; i++) {
+            if (mValues[i] != mLastSent[i]) {
+               mMidiOut.sendMidi(mStatusStart + i, mData1, mValues[i]);
+               mLastSent[i] = mValues[i];
+            }
+         }
+      }
+
+      private final int mStatusStart, mData1;
+
+      private final int[] mLastSent = {-1, -1, -1, -1};
+
+      private final int[] mValues = new int[4];
+   }
 }

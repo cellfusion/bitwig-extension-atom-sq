@@ -14,12 +14,18 @@ import java.util.function.Consumer;
 public class AtomSQExtension extends ControllerExtension
 {
    private final static int CC_ENCODER_1 = 0x0E;
-   private final static int CC_ALPHABET_1 = 0x18;
+   private final static int CC_ALPHABET_1 = 0x00;
    private final static int CC_PAD_1 = 0x24;
+   private final static int CC_DISPLAY_1 = 0x24;
    private final static int CC_STOP_UNDO = 0x6F;
    private final static int CC_PLAY_LOOP_TOGGLE = 0x6D;
    private final static int CC_RECORD_SAVE = 0x6B;
    private final static int CC_CLICK_COUNT_IN = 0x69;
+
+   private final static int CC_SONG = 0x20;
+   private final static int CC_INST = 0x21;
+   private final static int CC_EDITOR = 0x22;
+   private final static int CC_USER = 0x23;
 
    private final static int CC_SHIFT = 0x1F;
    private final static int CC_UP = 0x57;
@@ -29,6 +35,8 @@ public class AtomSQExtension extends ControllerExtension
 
    private final static int ENCODER_NUM = 8;
    private final static int PAD_NUM = 32;
+   private final static int ALPHABET_NUM = 8;
+   private final static int DISPLAY_NUM = 6;
 
    private static final Color WHITE = Color.fromRGB(1, 1, 1);
 
@@ -51,10 +59,13 @@ public class AtomSQExtension extends ControllerExtension
    private HardwareSurface mHardwareSurface;
    private MidiIn mMidiIn;
    private MidiOut mMidiOut;
-   private HardwareButton mShiftButton, mUpButton, mDownButton, mLeftButton, mRightButton, mClickCountInButton, mRecordSaveButton, mPlayLoopButton, mStopUndoButton;
+   private HardwareButton mShiftButton, mUpButton, mDownButton, mLeftButton, mRightButton, mClickCountInButton, mRecordSaveButton, mPlayLoopButton, mStopUndoButton, mSongButton, mInstButton, mEditorButton, mUserButton;
 
    private final RelativeHardwareKnob[] mEncoders = new RelativeHardwareKnob[ENCODER_NUM];
    private final HardwareButton[] mPadButtons = new HardwareButton[PAD_NUM];
+
+   private final HardwareButton[] mAlphabetButtons = new HardwareButton[ALPHABET_NUM];
+   private final HardwareButton[] mDisplayButtons = new HardwareButton[DISPLAY_NUM];
 
    private final MultiStateHardwareLight[] mPadLights = new MultiStateHardwareLight[PAD_NUM];
 
@@ -225,6 +236,17 @@ public class AtomSQExtension extends ControllerExtension
       mRightButton = createToggleButton("right", CC_RIGHT, ORANGE);
       mRightButton.setLabel("Right");
 
+      // Mode section
+      mSongButton = createToggleButton("song", CC_SONG, BLUE);
+      mSongButton.setLabel("Song");
+      mInstButton = createToggleButton("inst", CC_INST, BLUE);
+      mInstButton.setLabel("Inst");
+      mEditorButton = createToggleButton("editor", CC_EDITOR, BLUE);
+      mEditorButton.setLabel("Editor");
+      mUserButton = createToggleButton("user", CC_USER, BLUE);
+      mUserButton.setLabel("User");
+
+
       // TRANS section
       mClickCountInButton = createToggleButton("click_count_in", CC_CLICK_COUNT_IN, BLUE);
       mClickCountInButton.setLabel("Click\nCount in");
@@ -234,6 +256,17 @@ public class AtomSQExtension extends ControllerExtension
       mPlayLoopButton.setLabel("Play\nLoop");
       mStopUndoButton = createToggleButton("stop_undo", CC_STOP_UNDO, ORANGE);
       mStopUndoButton.setLabel("Stop\nUndo");
+
+
+      // Alphabet section
+      for (int i = 0; i < ALPHABET_NUM; i++) {
+
+      }
+
+      // Display section
+      for (int i = 0; i < DISPLAY_NUM; i++) {
+
+      }
 
       // Pads
       for (int i = 0; i < PAD_NUM; i++) {

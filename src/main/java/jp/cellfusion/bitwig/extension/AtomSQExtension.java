@@ -68,7 +68,7 @@ public class AtomSQExtension extends ControllerExtension
    };
 
    private Application mApplication;
-   private Layer mBaseLayer;
+   private Layer mSongLayer;
    private boolean mShift;
    private Transport mTransport;
    private NoteInput mNoteInput;
@@ -336,38 +336,38 @@ public class AtomSQExtension extends ControllerExtension
 
    private void initLayers()
    {
-      mBaseLayer = new Layer(mLayers, "Base");
+      mSongLayer = new Layer(mLayers, "Song");
 
-      initBaseLayer();
+      initSongLayer();
 
       DebugUtilities.createDebugLayer(mLayers, mHardwareSurface).activate();
    }
 
-   private void initBaseLayer()
+   private void initSongLayer()
    {
-      mBaseLayer.bindIsPressed(mShiftButton, this::setIsShiftPressed);
-      mBaseLayer.bindToggle(mClickCountInButton, mTransport.isMetronomeEnabled());
+      mSongLayer.bindIsPressed(mShiftButton, this::setIsShiftPressed);
+      mSongLayer.bindToggle(mClickCountInButton, mTransport.isMetronomeEnabled());
 
-      mBaseLayer.bindToggle(mPlayLoopButton, () -> {
+      mSongLayer.bindToggle(mPlayLoopButton, () -> {
          if (mShift) mTransport.isArrangerLoopEnabled().toggle();
          else mTransport.play();
       }, mTransport.isPlaying());
 
-      mBaseLayer.bindToggle(mStopUndoButton, () -> {
+      mSongLayer.bindToggle(mStopUndoButton, () -> {
          if (mShift) mApplication.undo();
          else mTransport.stop();
       }, () -> !mTransport.isPlaying().get());
 
-      mBaseLayer.bindToggle(mRecordSaveButton, () -> {
+      mSongLayer.bindToggle(mRecordSaveButton, () -> {
          if (mShift) save();
          else mTransport.isArrangerRecordEnabled().toggle();
       }, mTransport.isArrangerRecordEnabled());
 
       // nav
-      mBaseLayer.bindToggle(mUpButton, mCursorTrack.selectPreviousAction(), mCursorTrack.hasPrevious());
-      mBaseLayer.bindToggle(mDownButton, mCursorTrack.selectNextAction(), mCursorTrack.hasNext());
-      mBaseLayer.bindToggle(mLeftButton, mCursorDevice.selectPreviousAction(), mCursorDevice.hasPrevious());
-      mBaseLayer.bindToggle(mRightButton, mCursorDevice.selectNextAction(), mCursorDevice.hasNext());
+      mSongLayer.bindToggle(mUpButton, mCursorTrack.selectPreviousAction(), mCursorTrack.hasPrevious());
+      mSongLayer.bindToggle(mDownButton, mCursorTrack.selectNextAction(), mCursorTrack.hasNext());
+      mSongLayer.bindToggle(mLeftButton, mCursorDevice.selectPreviousAction(), mCursorDevice.hasPrevious());
+      mSongLayer.bindToggle(mRightButton, mCursorDevice.selectNextAction(), mCursorDevice.hasNext());
 
       // encoder
       for (int i = 0; i < ENCODER_NUM; i++)
@@ -375,7 +375,7 @@ public class AtomSQExtension extends ControllerExtension
          final Parameter parameter = mCursorRemoteControls.getParameter(i);
          final RelativeHardwareKnob encoder = mEncoders[i];
 
-         mBaseLayer.bind(encoder, parameter);
+         mSongLayer.bind(encoder, parameter);
       }
 
       // pads
@@ -385,15 +385,15 @@ public class AtomSQExtension extends ControllerExtension
          final int padIndex = i;
 
          // TODO mode
-         mBaseLayer.bindPressed(padButton, () -> {
+         mSongLayer.bindPressed(padButton, () -> {
             mCursorClip.scrollToKey(36 + padIndex);
             mCurrentPadForSteps = padIndex;
          });
 
-         mBaseLayer.bind(() -> getDrumPadColor(padIndex), padButton);
+         mSongLayer.bind(() -> getDrumPadColor(padIndex), padButton);
       }
 
-      mBaseLayer.activate();
+      mSongLayer.activate();
    }
 
    private void save()

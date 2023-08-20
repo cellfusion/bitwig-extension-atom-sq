@@ -168,10 +168,8 @@ public class AtomSQExtension extends ControllerExtension
       final String id = "encoder" + (i + 1);
 
       final RelativeHardwareKnob knob = mHardwareSurface.createRelativeHardwareKnob(id);
-      final AbsoluteHardwareValueMatcher absoluteCCValueMatcher = mMidiIn.createAbsoluteCCValueMatcher(0,
-              CC_ENCODER_1 + i);
       knob.setAdjustValueMatcher(
-              mMidiIn.createRelative2sComplementValueMatcher(absoluteCCValueMatcher, 127));
+              mMidiIn.createRelativeSignedBitCCValueMatcher(0, CC_ENCODER_1 + i, 50));
       knob.isUpdatingTargetValue().markInterested();
       knob.setLabel(id);
       knob.setIndexInGroup(i);

@@ -198,6 +198,9 @@ public class AtomSQExtension extends ControllerExtension
    @Override
    public void exit()
    {
+      // Turn off Native Mode
+      mMidiOut.sendMidi(0x8f, 0, 0);
+
       // For now just show a popup notification for verification that it is no longer running.
       getHost().showPopupNotification("Atom SQ Exited");
    }

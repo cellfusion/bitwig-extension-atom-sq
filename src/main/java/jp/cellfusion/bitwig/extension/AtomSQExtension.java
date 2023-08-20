@@ -11,10 +11,10 @@ public class AtomSQExtension extends ControllerExtension
 {
    private final static int CC_ENCODER_1 = 0x0E;
    private final static int CC_ALPHABET_1 = 0x18;
-   private final static int CC_STOP = 0x55;
-   private final static int CC_PLAY = 0x56;
-   private final static int CC_REC = 0x57;
-   private final static int CC_METRONOME = 0x58;
+   private final static int CC_STOP_UNDO = 0x6F;
+   private final static int CC_PLAY_LOOP_TOGGLE = 0x6D;
+   private final static int CC_RECORD_SAVE = 0x6B;
+   private final static int CC_CLICK_COUNT_IN = 0x69;
 
    private final static int CC_SHIFT = 0x1F;
    private final static int CC_UP = 0x57;
@@ -44,13 +44,9 @@ public class AtomSQExtension extends ControllerExtension
    private HardwareSurface mHardwareSurface;
    private MidiIn mMidiIn;
    private MidiOut mMidiOut;
-   private HardwareButton mShiftButton;
-   private HardwareButton mUpButton;
-   private HardwareButton mDownButton;
-   private HardwareButton mLeftButton;
-   private HardwareButton mRightButton;
+   private HardwareButton mShiftButton, mUpButton, mDownButton, mLeftButton, mRightButton, mClickCountInButton, mRecordSaveButton, mPlayLoopButton, mStopUndoButton;
 
-   private RelativeHardwareKnob[] mEncoders = new RelativeHardwareKnob[ENCODER_NUM];
+   private final RelativeHardwareKnob[] mEncoders = new RelativeHardwareKnob[ENCODER_NUM];
 
    private final Layers mLayers = new Layers(this)
    {
@@ -61,7 +57,10 @@ public class AtomSQExtension extends ControllerExtension
       }
    };
 
+   private Application mApplication;
    private Layer mBaseLayer;
+   private boolean mShift;
+   private Transport mTransport;
 
    protected AtomSQExtension(final AtomSQExtensionDefinition definition, final ControllerHost host)
    {
@@ -72,6 +71,7 @@ public class AtomSQExtension extends ControllerExtension
    public void init()
    {
       final ControllerHost host = getHost();
+      mApplication = host.createApplication();
 
       mMidiIn = host.getMidiInPort(0);
 
@@ -97,6 +97,10 @@ public class AtomSQExtension extends ControllerExtension
             getHost().requestFlush();
          });
       }
+
+      mTransport = host.createTransport();
+      mTransport.isPlaying().markInterested();
+      mTransport.getPosition().markInterested();
 
 
       createHardwareSurface();
@@ -125,6 +129,15 @@ public class AtomSQExtension extends ControllerExtension
       mHardwareSurface.updateHardware();
    }
 
+   private void setIsShiftPressed(final boolean value)
+   {
+      if (value != mShift)
+      {
+         mShift = value;
+         mLayers.setGlobalSensitivity(value ? 0.1 : 1);
+      }
+   }
+
    private void createHardwareSurface()
    {
       final ControllerHost host = getHost();
@@ -143,6 +156,16 @@ public class AtomSQExtension extends ControllerExtension
       mLeftButton.setLabel("Left");
       mRightButton = createToggleButton("right", CC_RIGHT, ORANGE);
       mRightButton.setLabel("Right");
+
+      // TRANS section
+      mClickCountInButton = createToggleButton("click_count_in", CC_CLICK_COUNT_IN, BLUE);
+      mClickCountInButton.setLabel("Click\nCount in");
+      mRecordSaveButton = createToggleButton("record_save", CC_RECORD_SAVE, RED);
+      mRecordSaveButton.setLabel("Record\nSave");
+      mPlayLoopButton = createToggleButton("play_loop", CC_PLAY_LOOP_TOGGLE, GREEN);
+      mPlayLoopButton.setLabel("Play\nLoop");
+      mStopUndoButton = createToggleButton("stop_undo", CC_STOP_UNDO, ORANGE);
+      mStopUndoButton.setLabel("Stop\nUndo");
 
       // Pads
 
@@ -224,6 +247,24 @@ public class AtomSQExtension extends ControllerExtension
 
    private void initBaseLayer()
    {
+      mBaseLayer.bindIsPressed(mShiftButton, this::setIsShiftPressed);
+      mBaseLayer.bindToggle(mClickCountInButton, mTransport.isMetronomeEnabled());
+
+      mBaseLayer.bindToggle(mPlayLoopButton, () -> {
+         if (mShift) mTransport.isArrangerLoopEnabled().toggle();
+         else mTransport.play();
+      }, mTransport.isPlaying());
+
+      mBaseLayer.bindToggle(mStopUndoButton, () -> {
+         if (mShift) mApplication.undo();
+         else mTransport.stop();
+      }, () -> !mTransport.isPlaying().get());
+
+      mBaseLayer.bindToggle(mRecordSaveButton, () -> {
+         if (mShift) save();
+         else mTransport.isArrangerRecordEnabled().toggle();
+      }, mTransport.isArrangerRecordEnabled());
+
       // nav
       mBaseLayer.bindToggle(mUpButton, mCursorTrack.selectPreviousAction(), mCursorTrack.hasPrevious());
       mBaseLayer.bindToggle(mDownButton, mCursorTrack.selectNextAction(), mCursorTrack.hasNext());
@@ -240,6 +281,15 @@ public class AtomSQExtension extends ControllerExtension
       }
 
       mBaseLayer.activate();
+   }
+
+   private void save()
+   {
+      final Action saveAction = mApplication.getAction("Save");
+      if (saveAction != null)
+      {
+         saveAction.invoke();
+      }
    }
 
 }

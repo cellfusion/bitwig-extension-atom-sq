@@ -1,6 +1,7 @@
 package jp.cellfusion.bitwig.extension;
 
 import com.bitwig.extension.api.Color;
+import com.bitwig.extension.api.util.midi.SysexBuilder;
 import com.bitwig.extension.controller.ControllerExtension;
 import com.bitwig.extension.controller.api.*;
 import com.bitwig.extensions.framework.BooleanObject;
@@ -192,6 +193,10 @@ public class AtomSQExtension extends ControllerExtension
 
       // Turn on Native Mode
       mMidiOut.sendMidi(0x8f, 0, 127);
+
+      // init display
+      writeDisplay(6, "Bitwig Studio");
+      writeDisplay(7, "ATOM SQ");
 
       // For now just show a popup notification for verification that it is running.
       host.showPopupNotification("Atom SQ Initialized");
@@ -593,6 +598,14 @@ public class AtomSQExtension extends ControllerExtension
       }
 
       return 0;
+   }
+
+   private void writeDisplay(int place, String text) {
+      final SysexBuilder sb = SysexBuilder.fromHex("F0 00 01 06 22 12");
+      sb.addByte(place);
+      sb.addHex("00 5B 5B 00");
+      sb.addString(text, text.length());
+      mMidiOut.sendSysex(sb.terminate());
    }
 
    private Color mixColorWithWhite(final Color color, final int velocity) {

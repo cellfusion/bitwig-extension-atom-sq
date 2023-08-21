@@ -4,10 +4,7 @@ import com.bitwig.extension.api.Color;
 import com.bitwig.extension.api.util.midi.SysexBuilder;
 import com.bitwig.extension.controller.ControllerExtension;
 import com.bitwig.extension.controller.api.*;
-import com.bitwig.extensions.framework.BooleanObject;
-import com.bitwig.extensions.framework.DebugUtilities;
-import com.bitwig.extensions.framework.Layer;
-import com.bitwig.extensions.framework.Layers;
+import com.bitwig.extensions.framework.*;
 import com.bitwig.extensions.util.NoteInputUtils;
 
 import java.util.ArrayList;
@@ -82,9 +79,11 @@ public class AtomSQExtension extends ControllerExtension
    };
 
    private Application mApplication;
+   private Layer mBaseLayer;
    private Layer mSongLayer;
    private Layer mInstrumentLayer;
    private Layer mEditorLayer;
+   private LayerGroup mModeLayerGroup;
    private boolean mShift;
    private Transport mTransport;
    private NoteInput mNoteInput;
@@ -387,15 +386,62 @@ public class AtomSQExtension extends ControllerExtension
 
    private void initLayers()
    {
+      mBaseLayer = new Layer(mLayers, "Base");
+
       mSongLayer = new Layer(mLayers, "Song");
       mInstrumentLayer = new Layer(mLayers, "Instrument");
       mEditorLayer = new Layer(mLayers, "Editor");
 
+      mModeLayerGroup = new LayerGroup(mSongLayer, mInstrumentLayer, mEditorLayer);
+
+      initBaseLayer();
       initSongLayer();
       initInstrumentLayer();
       initEditorLayer();
 
       DebugUtilities.createDebugLayer(mLayers, mHardwareSurface).activate();
+   }
+
+   private void initBaseLayer() {
+      mBaseLayer.bindIsPressed(mShiftButton, this::setIsShiftPressed);
+
+      // transport
+      mBaseLayer.bindToggle(mClickCountInButton, mTransport.isMetronomeEnabled());
+      mBaseLayer.bindToggle(mPlayLoopButton, () -> {
+         if (mShift) mTransport.isArrangerLoopEnabled().toggle();
+         else mTransport.play();
+      }, mTransport.isPlaying());
+
+      mBaseLayer.bindToggle(mStopUndoButton, () -> {
+         if (mShift) mApplication.undo();
+         else mTransport.stop();
+      }, () -> !mTransport.isPlaying().get());
+
+      mBaseLayer.bindToggle(mRecordSaveButton, () -> {
+         if (mShift) save();
+         else mTransport.isArrangerRecordEnabled().toggle();
+      }, mTransport.isArrangerRecordEnabled());
+
+      // layer
+      mBaseLayer.bindToggle(mSongButton, mSongLayer);
+      mBaseLayer.bindToggle(mInstButton, mInstrumentLayer);
+      mBaseLayer.bindToggle(mEditorButton, mEditorLayer);
+
+      // nav
+      mBaseLayer.bindToggle(mUpButton, mCursorTrack.selectPreviousAction(), mCursorTrack.hasPrevious());
+      mBaseLayer.bindToggle(mDownButton, mCursorTrack.selectNextAction(), mCursorTrack.hasNext());
+      mBaseLayer.bindToggle(mLeftButton, mCursorDevice.selectPreviousAction(), mCursorDevice.hasPrevious());
+      mBaseLayer.bindToggle(mRightButton, mCursorDevice.selectNextAction(), mCursorDevice.hasNext());
+
+      // encoder
+      for (int i = 0; i < ENCODER_NUM; i++) {
+         final Parameter parameter = mCursorRemoteControls.getParameter(i);
+         final RelativeHardwareKnob encoder = mEncoders[i];
+
+         mBaseLayer.bind(encoder, parameter);
+      }
+
+      mBaseLayer.activate();
    }
 
    private void initEditorLayer() {
@@ -442,36 +488,6 @@ public class AtomSQExtension extends ControllerExtension
 
    private void initSongLayer()
    {
-      mSongLayer.bindIsPressed(mShiftButton, this::setIsShiftPressed);
-      mSongLayer.bindToggle(mClickCountInButton, mTransport.isMetronomeEnabled());
-
-      mSongLayer.bindToggle(mPlayLoopButton, () -> {
-         if (mShift) mTransport.isArrangerLoopEnabled().toggle();
-         else mTransport.play();
-      }, mTransport.isPlaying());
-
-      mSongLayer.bindToggle(mStopUndoButton, () -> {
-         if (mShift) mApplication.undo();
-         else mTransport.stop();
-      }, () -> !mTransport.isPlaying().get());
-
-      mSongLayer.bindToggle(mRecordSaveButton, () -> {
-         if (mShift) save();
-         else mTransport.isArrangerRecordEnabled().toggle();
-      }, mTransport.isArrangerRecordEnabled());
-
-      // layer
-      // TODO switch layer
-//      mSongLayer.bind(() -> mSongLayer.isActive() ? BLUE : null, mSongButton);
-      mSongLayer.bindToggle(mInstButton, mInstrumentLayer);
-      mSongLayer.bindToggle(mEditorButton, mEditorLayer);
-
-      // nav
-      mSongLayer.bindToggle(mUpButton, mCursorTrack.selectPreviousAction(), mCursorTrack.hasPrevious());
-      mSongLayer.bindToggle(mDownButton, mCursorTrack.selectNextAction(), mCursorTrack.hasNext());
-      mSongLayer.bindToggle(mLeftButton, mCursorDevice.selectPreviousAction(), mCursorDevice.hasPrevious());
-      mSongLayer.bindToggle(mRightButton, mCursorDevice.selectNextAction(), mCursorDevice.hasNext());
-
       mSongLayer.bindPressed(mDisplayButtons[0], () -> mCursorTrack.solo().toggle());
 //      mSongLayer.bind(() -> mCursorTrack.solo().get() ? ORANGE : null, mDisplayButtons[0]);
 
@@ -487,15 +503,6 @@ public class AtomSQExtension extends ControllerExtension
       // mSongLayer.bindPressed(mDisplayButtons[4], () -> mCursorTrack.arm().toggle());
       // TODO Stop clip stop
       // mSongLayer.bindPressed(mDisplayButtons[5], () -> mCursorTrack.arm().toggle());
-
-      // encoder
-      for (int i = 0; i < ENCODER_NUM; i++)
-      {
-         final Parameter parameter = mCursorRemoteControls.getParameter(i);
-         final RelativeHardwareKnob encoder = mEncoders[i];
-
-         mSongLayer.bind(encoder, parameter);
-      }
 
       // pads
       // TODO 1-16 select instrument
@@ -518,8 +525,6 @@ public class AtomSQExtension extends ControllerExtension
          });
          mSongLayer.bind(() -> slot.hasContent().get() ? getClipColor(slot) : null, padButton);
       }
-
-      mSongLayer.activate();
    }
 
    private Color getClipColor(final ClipLauncherSlot s) {

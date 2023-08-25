@@ -51,12 +51,12 @@ public class AtomSQExtension extends ControllerExtension {
     private static final Color BLUE = Color.fromRGB(0, 0, 1);
     private static final int LAUNCHER_SCENES = 16;
 
-    private CursorTrack mCursorTrack;
-    private PinnableCursorDevice mCursorDevice;
+    private CursorTrack cursorTrack;
+    private PinnableCursorDevice cursorDevice;
     private CursorRemoteControlsPage mCursorRemoteControls;
     private HardwareSurface mHardwareSurface;
-    private MidiIn mMidiIn;
-    private MidiOut mMidiOut;
+    private MidiIn midiIn;
+    private MidiOut midiOut;
     private HardwareButton mShiftButton, mUpButton, mDownButton, mLeftButton, mRightButton, mClickCountInButton, mRecordSaveButton, mPlayLoopButton, mStopUndoButton, mSongButton, mInstButton, mEditorButton, mUserButton;
     private final RelativeHardwareKnob[] mEncoders = new RelativeHardwareKnob[ENCODER_NUM];
     private final HardwareButton[] mPadButtons = new HardwareButton[PAD_NUM];
@@ -64,12 +64,7 @@ public class AtomSQExtension extends ControllerExtension {
     private final HardwareButton[] mDisplayButtons = new HardwareButton[DISPLAY_NUM];
     private final MultiStateHardwareLight[] mPadLights = new MultiStateHardwareLight[PAD_NUM];
 
-    private final Layers mLayers = new Layers(this) {
-        @Override
-        protected void activeLayersChanged() {
-            super.activeLayersChanged();
-        }
-    };
+    private Layers layers;
 
     private Application mApplication;
     private Layer mBaseLayer;
@@ -78,7 +73,8 @@ public class AtomSQExtension extends ControllerExtension {
     private Layer mEditorLayer;
     private LayerGroup mModeLayerGroup;
     private boolean mShift;
-    private Transport mTransport;
+    private Transport transport;
+    private PinnableCursorDevice primaryDevice;
     private NoteInput mNoteInput;
     private PlayingNote[] mPlayingNotes;
     private DrumPadBank mDrumPadBank;
@@ -87,6 +83,20 @@ public class AtomSQExtension extends ControllerExtension {
     private final int[] mStepData = new int[16];
     private int mCurrentPadForSteps;
     private SceneBank mSceneBank;
+    private ControllerHost host;
+
+
+    public Layers getLayers() {
+        return layers;
+    }
+
+    public PinnableCursorDevice getCursorDevice() {
+        return cursorDevice;
+    }
+
+    public PinnableCursorDevice getPrimaryDevice() {
+        return primaryDevice;
+    }
 
 
     protected AtomSQExtension(final AtomSQExtensionDefinition definition, final ControllerHost host) {
@@ -95,20 +105,21 @@ public class AtomSQExtension extends ControllerExtension {
 
     @Override
     public void init() {
-        final ControllerHost host = getHost();
+        host = getHost();
         mApplication = host.createApplication();
+        layers = new Layers(this);
 
-        mMidiIn = host.getMidiInPort(0);
-        mMidiOut = host.getMidiOutPort(0);
+        midiIn = host.getMidiInPort(0);
+        midiOut = host.getMidiOutPort(0);
 
-        mNoteInput = mMidiIn.createNoteInput("Pads", getNoteInputMask());
+        mNoteInput = midiIn.createNoteInput("Pads", getNoteInputMask());
         mNoteInput.setShouldConsumeEvents(true);
 
-        mCursorTrack = host.createCursorTrack(0, LAUNCHER_SCENES);
-        mCursorTrack.arm().markInterested();
+        cursorTrack = host.createCursorTrack(0, LAUNCHER_SCENES);
+        cursorTrack.arm().markInterested();
         mSceneBank = host.createSceneBank(LAUNCHER_SCENES);
         for (int s = 0; s < LAUNCHER_SCENES; s++) {
-            final ClipLauncherSlot slot = mCursorTrack.clipLauncherSlotBank().getItemAt(s);
+            final ClipLauncherSlot slot = cursorTrack.clipLauncherSlotBank().getItemAt(s);
             slot.color().markInterested();
             slot.isPlaying().markInterested();
             slot.isRecording().markInterested();
@@ -121,9 +132,9 @@ public class AtomSQExtension extends ControllerExtension {
             scene.exists().markInterested();
         }
 
-        mCursorDevice = mCursorTrack.createCursorDevice("ATOM_SQ", "Atom SQ", 0, CursorDeviceFollowMode.FIRST_INSTRUMENT);
+        cursorDevice = cursorTrack.createCursorDevice("ATOM_SQ", "Atom SQ", 0, CursorDeviceFollowMode.FIRST_INSTRUMENT);
 
-        mCursorRemoteControls = mCursorDevice.createCursorRemoteControlsPage(ENCODER_NUM);
+        mCursorRemoteControls = cursorDevice.createCursorRemoteControlsPage(ENCODER_NUM);
         mCursorRemoteControls.setHardwareLayout(HardwareControlType.ENCODER, ENCODER_NUM);
 
         for (int i = 0; i < ENCODER_NUM; i++) {
@@ -139,11 +150,11 @@ public class AtomSQExtension extends ControllerExtension {
             });
         }
 
-        mTransport = host.createTransport();
-        mTransport.isPlaying().markInterested();
-        mTransport.getPosition().markInterested();
+        transport = host.createTransport();
+        transport.isPlaying().markInterested();
+        transport.getPosition().markInterested();
 
-        mCursorClip = mCursorTrack.createLauncherCursorClip(16, 1);
+        mCursorClip = cursorTrack.createLauncherCursorClip(16, 1);
         mCursorClip.color().markInterested();
         mCursorClip.clipLauncherSlot().color().markInterested();
         mCursorClip.clipLauncherSlot().isPlaying().markInterested();
@@ -170,23 +181,23 @@ public class AtomSQExtension extends ControllerExtension {
                     mStepData[x] = 0;
             }
         });
-        mCursorTrack.playingNotes().addValueObserver(notes -> mPlayingNotes = notes);
+        cursorTrack.playingNotes().addValueObserver(notes -> mPlayingNotes = notes);
 
-        mDrumPadBank = mCursorDevice.createDrumPadBank(PAD_NUM);
+        mDrumPadBank = cursorDevice.createDrumPadBank(PAD_NUM);
         mDrumPadBank.exists().markInterested();
 
-        mCursorTrack.color().markInterested();
+        cursorTrack.color().markInterested();
 
         createHardwareSurface();
 
         initLayers();
 
         // Turn on Native Mode
-        mMidiOut.sendMidi(0x8f, 0, 127);
+        midiOut.sendMidi(0x8f, 0, 127);
 
         // init display
-        AtomSQUtils.writeDisplay(6, "Bitwig Studio", mMidiOut);
-        AtomSQUtils.writeDisplay(7, "ATOM SQ", mMidiOut);
+        AtomSQUtils.writeDisplay(6, "Bitwig Studio", midiOut);
+        AtomSQUtils.writeDisplay(7, "ATOM SQ", midiOut);
 
         // For now just show a popup notification for verification that it is running.
         host.showPopupNotification("Atom SQ Initialized");
@@ -196,7 +207,7 @@ public class AtomSQExtension extends ControllerExtension {
     @Override
     public void exit() {
         // Turn off Native Mode
-        mMidiOut.sendMidi(0x8f, 0, 0);
+        midiOut.sendMidi(0x8f, 0, 0);
 
         // For now just show a popup notification for verification that it is no longer running.
         getHost().showPopupNotification("Atom SQ Exited");
@@ -210,7 +221,7 @@ public class AtomSQExtension extends ControllerExtension {
     private void setIsShiftPressed(final boolean value) {
         if (value != mShift) {
             mShift = value;
-            mLayers.setGlobalSensitivity(value ? 0.1 : 1);
+            layers.setGlobalSensitivity(value ? 0.1 : 1);
         }
     }
 
@@ -281,7 +292,7 @@ public class AtomSQExtension extends ControllerExtension {
 
         // Encoder
         for (int i = 0; i < ENCODER_NUM; i++) {
-            final RelativeHardwareKnob encoder = createEncoder(mHardwareSurface, mMidiIn, i);
+            final RelativeHardwareKnob encoder = createEncoder(mHardwareSurface, midiIn, i);
             mEncoders[i] = encoder;
         }
 
@@ -327,7 +338,7 @@ public class AtomSQExtension extends ControllerExtension {
         button.setBackgroundLight(light);
 
         light.isOn().onUpdateHardware(value -> {
-            mMidiOut.sendMidi(0xB0, controlNumber, value ? 127 : 0);
+            midiOut.sendMidi(0xB0, controlNumber, value ? 127 : 0);
         });
 
         return button;
@@ -337,9 +348,9 @@ public class AtomSQExtension extends ControllerExtension {
         final HardwareButton button = mHardwareSurface.createHardwareButton(id);
         final MidiExpressions midiExpressions = getHost().midiExpressions();
 
-        button.pressedAction().setActionMatcher(mMidiIn
+        button.pressedAction().setActionMatcher(midiIn
                 .createActionMatcher(midiExpressions.createIsCCExpression(0, controlNumber) + " && data2 > 0"));
-        button.releasedAction().setActionMatcher(mMidiIn.createCCActionMatcher(0, controlNumber, 0));
+        button.releasedAction().setActionMatcher(midiIn.createCCActionMatcher(0, controlNumber, 0));
         button.setLabelColor(BLACK);
 
         return button;
@@ -351,8 +362,8 @@ public class AtomSQExtension extends ControllerExtension {
         pad.setLabelColor(BLACK);
 
         final int note = CC_PAD_1 + index;
-        pad.pressedAction().setPressureActionMatcher(mMidiIn.createNoteOnVelocityValueMatcher(0, note));
-        pad.releasedAction().setActionMatcher(mMidiIn.createNoteOffActionMatcher(0, note));
+        pad.pressedAction().setPressureActionMatcher(midiIn.createNoteOnVelocityValueMatcher(0, note));
+        pad.releasedAction().setActionMatcher(midiIn.createNoteOffActionMatcher(0, note));
 
         mPadButtons[index] = pad;
 
@@ -369,11 +380,11 @@ public class AtomSQExtension extends ControllerExtension {
     }
 
     private void initLayers() {
-        mBaseLayer = new Layer(mLayers, "Base");
+        mBaseLayer = new Layer(layers, "Base");
 
-        mSongLayer = new Layer(mLayers, "Song");
-        mInstrumentLayer = new Layer(mLayers, "Instrument");
-        mEditorLayer = new Layer(mLayers, "Editor");
+        mSongLayer = new Layer(layers, "Song");
+        mInstrumentLayer = new Layer(layers, "Instrument");
+        mEditorLayer = new Layer(layers, "Editor");
 
         mModeLayerGroup = new LayerGroup(mSongLayer, mInstrumentLayer, mEditorLayer);
 
@@ -382,28 +393,28 @@ public class AtomSQExtension extends ControllerExtension {
         initInstrumentLayer();
         initEditorLayer();
 
-        DebugUtilities.createDebugLayer(mLayers, mHardwareSurface).activate();
+        DebugUtilities.createDebugLayer(layers, mHardwareSurface).activate();
     }
 
     private void initBaseLayer() {
         mBaseLayer.bindIsPressed(mShiftButton, this::setIsShiftPressed);
 
         // transport
-        mBaseLayer.bindToggle(mClickCountInButton, mTransport.isMetronomeEnabled());
+        mBaseLayer.bindToggle(mClickCountInButton, transport.isMetronomeEnabled());
         mBaseLayer.bindToggle(mPlayLoopButton, () -> {
-            if (mShift) mTransport.isArrangerLoopEnabled().toggle();
-            else mTransport.play();
-        }, mTransport.isPlaying());
+            if (mShift) transport.isArrangerLoopEnabled().toggle();
+            else transport.play();
+        }, transport.isPlaying());
 
         mBaseLayer.bindToggle(mStopUndoButton, () -> {
             if (mShift) mApplication.undo();
-            else mTransport.stop();
-        }, () -> !mTransport.isPlaying().get());
+            else transport.stop();
+        }, () -> !transport.isPlaying().get());
 
         mBaseLayer.bindToggle(mRecordSaveButton, () -> {
             if (mShift) save();
-            else mTransport.isArrangerRecordEnabled().toggle();
-        }, mTransport.isArrangerRecordEnabled());
+            else transport.isArrangerRecordEnabled().toggle();
+        }, transport.isArrangerRecordEnabled());
 
         // layer
         mBaseLayer.bindToggle(mSongButton, mSongLayer);
@@ -411,10 +422,10 @@ public class AtomSQExtension extends ControllerExtension {
         mBaseLayer.bindToggle(mEditorButton, mEditorLayer);
 
         // nav
-        mBaseLayer.bindToggle(mUpButton, mCursorTrack.selectPreviousAction(), mCursorTrack.hasPrevious());
-        mBaseLayer.bindToggle(mDownButton, mCursorTrack.selectNextAction(), mCursorTrack.hasNext());
-        mBaseLayer.bindToggle(mLeftButton, mCursorDevice.selectPreviousAction(), mCursorDevice.hasPrevious());
-        mBaseLayer.bindToggle(mRightButton, mCursorDevice.selectNextAction(), mCursorDevice.hasNext());
+        mBaseLayer.bindToggle(mUpButton, cursorTrack.selectPreviousAction(), cursorTrack.hasPrevious());
+        mBaseLayer.bindToggle(mDownButton, cursorTrack.selectNextAction(), cursorTrack.hasNext());
+        mBaseLayer.bindToggle(mLeftButton, cursorDevice.selectPreviousAction(), cursorDevice.hasPrevious());
+        mBaseLayer.bindToggle(mRightButton, cursorDevice.selectNextAction(), cursorDevice.hasNext());
 
         // encoder
         for (int i = 0; i < ENCODER_NUM; i++) {
@@ -436,7 +447,7 @@ public class AtomSQExtension extends ControllerExtension {
         // Device >
         //mEditorLayer.bindPressed(mDisplayButtons[2], () -> mCursorTrack.arm().toggle());
         // On/Off
-        mEditorLayer.bindPressed(mDisplayButtons[3], () -> mCursorDevice.isEnabled().toggle());
+        mEditorLayer.bindPressed(mDisplayButtons[3], () -> cursorDevice.isEnabled().toggle());
         // Previous Parameter Page
         mEditorLayer.bindToggle(mDisplayButtons[4], () -> mCursorRemoteControls.selectPrevious(), mCursorRemoteControls.hasPrevious());
         // Next Parameter Page
@@ -470,13 +481,13 @@ public class AtomSQExtension extends ControllerExtension {
     }
 
     private void initSongLayer() {
-        mSongLayer.bindPressed(mDisplayButtons[0], () -> mCursorTrack.solo().toggle());
+        mSongLayer.bindPressed(mDisplayButtons[0], () -> cursorTrack.solo().toggle());
 //      mSongLayer.bind(() -> mCursorTrack.solo().get() ? ORANGE : null, mDisplayButtons[0]);
 
-        mSongLayer.bindPressed(mDisplayButtons[1], () -> mCursorTrack.mute().toggle());
+        mSongLayer.bindPressed(mDisplayButtons[1], () -> cursorTrack.mute().toggle());
 //      mSongLayer.bind(() -> mCursorTrack.mute().get() ? ORANGE : null, mDisplayButtons[1]);
 
-        mSongLayer.bindPressed(mDisplayButtons[2], () -> mCursorTrack.arm().toggle());
+        mSongLayer.bindPressed(mDisplayButtons[2], () -> cursorTrack.arm().toggle());
 //      mSongLayer.bind(() -> mCursorTrack.arm().get() ? ORANGE : null, mDisplayButtons[2]);
 
         // TODO Clip start
@@ -500,7 +511,7 @@ public class AtomSQExtension extends ControllerExtension {
         for (int i = 0; i < 16; i++) {
             final HardwareButton padButton = mPadButtons[i + 16];
 
-            final ClipLauncherSlot slot = mCursorTrack.clipLauncherSlotBank().getItemAt(i);
+            final ClipLauncherSlot slot = cursorTrack.clipLauncherSlotBank().getItemAt(i);
             mSongLayer.bindPressed(padButton, () -> {
                 slot.select();
                 slot.launch();
@@ -517,12 +528,12 @@ public class AtomSQExtension extends ControllerExtension {
                 return Color.mix(s.color().get(), WHITE, 1 - getTransportPulse(4.0, 1));
             } else if (s.isRecording().get()) {
                 return RED;
-            } else if (s.isPlaying().get() && mTransport.isPlaying().get()) {
+            } else if (s.isPlaying().get() && transport.isPlaying().get()) {
                 return Color.mix(s.color().get(), WHITE, 1 - getTransportPulse(1.0, 1));
             }
 
             return s.color().get();
-        } else if (mCursorTrack.arm().get()) {
+        } else if (cursorTrack.arm().get()) {
             return Color.mix(BLACK, RED, 0.1f);
         }
 
@@ -530,7 +541,7 @@ public class AtomSQExtension extends ControllerExtension {
     }
 
     private float getTransportPulse(final double multiplier, final double amount) {
-        final double p = mTransport.getPosition().get() * multiplier;
+        final double p = transport.getPosition().get() * multiplier;
         return (float) ((0.5 + 0.5 * Math.cos(p * 2 * Math.PI)) * amount);
     }
 
@@ -554,7 +565,7 @@ public class AtomSQExtension extends ControllerExtension {
         Color drumPadColor;
 
         if (!padBankExists) {
-            drumPadColor = mCursorTrack.color().get();
+            drumPadColor = cursorTrack.color().get();
         } else {
             final Color sourceDrumPadColor = drumPad.color().get();
             final double red = sourceDrumPadColor.getRed() * darken;
@@ -619,7 +630,7 @@ public class AtomSQExtension extends ControllerExtension {
 
             for (int i = 0; i < 4; i++) {
                 if (mValues[i] != mLastSent[i]) {
-                    mMidiOut.sendMidi(mStatusStart + i, mData1, mValues[i]);
+                    midiOut.sendMidi(mStatusStart + i, mData1, mValues[i]);
                     mLastSent[i] = mValues[i];
                 }
             }

@@ -4,12 +4,12 @@ import com.bitwig.extension.api.Color;
 import com.bitwig.extension.controller.api.HardwareLightVisualState;
 import com.bitwig.extension.controller.api.InternalHardwareLightState;
 
-class RGBLightState extends InternalHardwareLightState {
+class RgbLightState extends InternalHardwareLightState {
     private static int colorPartFromDouble(final double x) {
         return Math.max(0, Math.min((int) (127.0 * x), 127));
     }
 
-    public RGBLightState(final int red, final int green, final int blue) {
+    public RgbLightState(final int red, final int green, final int blue) {
         super();
 
         assert red >= 0 && red <= 127;
@@ -22,12 +22,12 @@ class RGBLightState extends InternalHardwareLightState {
         mBlue = blue;
     }
 
-    public RGBLightState(final Color color) {
+    public RgbLightState(final Color color) {
         this(colorPartFromDouble(color.getRed()), colorPartFromDouble(color.getGreen()),
                 colorPartFromDouble(color.getBlue()));
     }
 
-    public RGBLightState() {
+    public RgbLightState() {
         mIsOn = false;
         mRed = 0;
         mGreen = 0;
@@ -73,7 +73,7 @@ class RGBLightState extends InternalHardwareLightState {
             return false;
         if (getClass() != obj.getClass())
             return false;
-        final RGBLightState other = (RGBLightState) obj;
+        final RgbLightState other = (RgbLightState) obj;
         if (mBlue != other.mBlue)
             return false;
         if (mGreen != other.mGreen)

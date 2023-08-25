@@ -291,7 +291,8 @@ public class AtomSQExtension extends ControllerExtension
 
       // Encoder
       for (int i = 0; i < ENCODER_NUM; i++) {
-         createEncoder(i);
+         final RelativeHardwareKnob encoder = createEncoder(mHardwareSurface, mMidiIn, i);
+         mEncoders[i] = encoder;
       }
 
       initHardwareLayout();
@@ -307,17 +308,18 @@ public class AtomSQExtension extends ControllerExtension
       surface.hardwareElementWithId("right").setBounds(178.25, 67.25, 14.0, 10.0);
    }
 
-   private void createEncoder(int i) {
+   private RelativeHardwareKnob createEncoder(HardwareSurface hardwareSurface, MidiIn midiIn, int i) {
       final String id = "encoder" + (i + 1);
 
-      final RelativeHardwareKnob knob = mHardwareSurface.createRelativeHardwareKnob(id);
+      final RelativeHardwareKnob knob = hardwareSurface.createRelativeHardwareKnob(id);
       knob.setAdjustValueMatcher(
-              mMidiIn.createRelativeSignedBitCCValueMatcher(0, CC_ENCODER_1 + i, 50));
+              midiIn.createRelativeSignedBitCCValueMatcher(0, CC_ENCODER_1 + i, 50));
       knob.isUpdatingTargetValue().markInterested();
       knob.setLabel(id);
       knob.setIndexInGroup(i);
       knob.setLabelPosition(RelativePosition.ABOVE);
-      mEncoders[i] = knob;
+
+      return knob;
    }
 
    private HardwareButton createToggleButton(

@@ -1,7 +1,6 @@
 package jp.cellfusion.bitwig.extension;
 
 import com.bitwig.extension.api.Color;
-import com.bitwig.extension.api.util.midi.SysexBuilder;
 import com.bitwig.extension.controller.ControllerExtension;
 import com.bitwig.extension.controller.api.*;
 import com.bitwig.extensions.framework.*;
@@ -60,13 +59,10 @@ public class AtomSQExtension extends ControllerExtension
    private MidiIn mMidiIn;
    private MidiOut mMidiOut;
    private HardwareButton mShiftButton, mUpButton, mDownButton, mLeftButton, mRightButton, mClickCountInButton, mRecordSaveButton, mPlayLoopButton, mStopUndoButton, mSongButton, mInstButton, mEditorButton, mUserButton;
-
    private final RelativeHardwareKnob[] mEncoders = new RelativeHardwareKnob[ENCODER_NUM];
    private final HardwareButton[] mPadButtons = new HardwareButton[PAD_NUM];
-
    private final HardwareButton[] mAlphabetButtons = new HardwareButton[ALPHABET_NUM];
    private final HardwareButton[] mDisplayButtons = new HardwareButton[DISPLAY_NUM];
-
    private final MultiStateHardwareLight[] mPadLights = new MultiStateHardwareLight[PAD_NUM];
 
    private final Layers mLayers = new Layers(this)
@@ -194,13 +190,12 @@ public class AtomSQExtension extends ControllerExtension
       mMidiOut.sendMidi(0x8f, 0, 127);
 
       // init display
-      writeDisplay(6, "Bitwig Studio");
-      writeDisplay(7, "ATOM SQ");
+      AtomSQUtils.writeDisplay(6, "Bitwig Studio", mMidiOut);
+      AtomSQUtils.writeDisplay(7, "ATOM SQ", mMidiOut);
 
       // For now just show a popup notification for verification that it is running.
       host.showPopupNotification("Atom SQ Initialized");
    }
-
 
 
    @Override
@@ -605,13 +600,6 @@ public class AtomSQExtension extends ControllerExtension
       return 0;
    }
 
-   private void writeDisplay(int place, String text) {
-      final SysexBuilder sb = SysexBuilder.fromHex("F0 00 01 06 22 12");
-      sb.addByte(place);
-      sb.addHex("00 5B 5B 00");
-      sb.addString(text, text.length());
-      mMidiOut.sendSysex(sb.terminate());
-   }
 
    private Color mixColorWithWhite(final Color color, final int velocity) {
       final float x = velocity / 127.f;

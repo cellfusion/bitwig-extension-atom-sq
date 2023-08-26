@@ -207,11 +207,15 @@ public class AtomSQExtension extends ControllerExtension {
         cursorTrack.color().markInterested();
 
         setUpHardware();
-        initLayers();
+
+        mBaseLayer = new Layer(layers, "Base");
+        bindEncoder(mBaseLayer, mainEncoder, this::mainEncoderAction);
 
         browserLayer = new BrowserLayer(this);
 
         mAlphabetButtons[0].isPressed().addValueObserver(this::handlePressButtonA);
+
+        initLayers();
 
         // Turn on Native Mode
         midiOut.sendMidi(0x8f, 0, 127);
@@ -224,8 +228,11 @@ public class AtomSQExtension extends ControllerExtension {
         host.showPopupNotification("Atom SQ Initialized");
     }
 
+    private void mainEncoderAction(final int dir) {
+        debugLog("mainEncoderAction", "dir:" + dir + ", shift:" + shiftDown.get());
+    }
+
     private void handlePressButtonA(final boolean down) {
-        debugLog("Button A  isPressed", "down:" + down + ", shift:" + shiftDown.get());
         if (down && shiftDown.get()) {
             browserLayer.shiftPressAction(down);
         } else if (down && browserLayer.isActive()) {
@@ -337,8 +344,13 @@ public class AtomSQExtension extends ControllerExtension {
     private RelativeHardwareKnob createMainEncoder(final int ccNumber) {
         final String id = "MAIN_ENCODER_" + ccNumber;
         final RelativeHardwareKnob encoder = hardwareSurface.createRelativeHardwareKnob(id);
-        encoder.setAdjustValueMatcher(
-                midiIn.createRelativeSignedBitCCValueMatcher(0, ccNumber, 50));
+        final RelativeHardwareValueMatcher stepUpMatcher = midiIn.createRelativeValueMatcher(
+                "(status == 176 && data1 == " + ccNumber + " && data2 > 64)", 1);
+        final RelativeHardwareValueMatcher stepDownMatcher = midiIn.createRelativeValueMatcher(
+                "(status == 176 && data1 == " + ccNumber + " && data2 < 63)", -1);
+        final RelativeHardwareValueMatcher matcher = host.createOrRelativeHardwareValueMatcher(stepDownMatcher,
+                stepUpMatcher);
+        encoder.setAdjustValueMatcher(matcher);
         encoder.isUpdatingTargetValue().markInterested();
         encoder.setLabel(id);
         //encoder.setLabelPosition(RelativePosition.ABOVE);
@@ -351,8 +363,13 @@ public class AtomSQExtension extends ControllerExtension {
         final String id = "ENCODER_" + ccNumber;
 
         final RelativeHardwareKnob encoder = hardwareSurface.createRelativeHardwareKnob(id);
-        encoder.setAdjustValueMatcher(
-                midiIn.createRelativeSignedBitCCValueMatcher(0, ccNumber, 50));
+        final RelativeHardwareValueMatcher stepUpMatcher = midiIn.createRelativeValueMatcher(
+                "(status == 176 && data1 == " + ccNumber + " && data2 > 64)", 1);
+        final RelativeHardwareValueMatcher stepDownMatcher = midiIn.createRelativeValueMatcher(
+                "(status == 176 && data1 == " + ccNumber + " && data2 < 63)", -1);
+        final RelativeHardwareValueMatcher matcher = host.createOrRelativeHardwareValueMatcher(stepDownMatcher,
+                stepUpMatcher);
+        encoder.setAdjustValueMatcher(matcher);
         encoder.isUpdatingTargetValue().markInterested();
         encoder.setLabel(id);
         encoder.setLabelPosition(RelativePosition.ABOVE);
@@ -418,7 +435,6 @@ public class AtomSQExtension extends ControllerExtension {
     }
 
     private void initLayers() {
-        mBaseLayer = new Layer(layers, "Base");
 
         mSongLayer = new Layer(layers, "Song");
         mInstrumentLayer = new Layer(layers, "Instrument");

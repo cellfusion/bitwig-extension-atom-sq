@@ -30,20 +30,31 @@ public class BrowserLayer extends Layer {
         browser.exists().addValueObserver(this::browserValueChanged);
         browser.contentTypeNames().addValueObserver(this::contentTypeNamesChanged);
         browser.selectedContentTypeIndex().markInterested();
+        browser.selectedContentTypeIndex().addValueObserver(this::selectedChanged);
 
         resultCursorItem = (CursorBrowserResultItem) browser.resultsColumn().createCursorItem();
 
-        browser.selectedContentTypeIndex().addValueObserver(this::selectedChanged);
-
         final RelativeHardwareKnob mainEncoder = driver.getMainEncoder();
-        driver.bindEncoder(this, mainEncoder, this::encoderAction);
+        driver.bindEncoder(this, mainEncoder, this::handleEncoder);
     }
 
-    private void encoderAction(int inc) {
+    private void handleEncoder(int dir) {
+        driver.debugLog("BrowserLayer", "encoderAction: " + dir + ", shift: " + driver.getShiftDown().get());
         if (driver.getShiftDown().get()) {
-            scrollContentType(inc);
+            final int index = browser.selectedContentTypeIndex().get();
+            if (index >= 0 && index < contentTypeNames.length) {
+                int next = index + dir;
+                next = next < 0 ? contentTypeNames.length - 1 : (next >= contentTypeNames.length) ? 0 : next;
+                browser.selectedContentTypeIndex().set(next);
+            }
         } else {
-            scrollResultItem(resultCursorItem, inc);
+            browser.shouldAudition().set(false);
+            isSelecting = true;
+            if (dir > 0) {
+                resultCursorItem.selectNext();
+            } else {
+                resultCursorItem.selectPrevious();
+            }
         }
     }
 
@@ -72,25 +83,6 @@ public class BrowserLayer extends Layer {
         }
     }
 
-    private void scrollResultItem(final CursorBrowserResultItem resultCursorItem, final int inc) {
-        browser.shouldAudition().set(false);
-        isSelecting = true;
-        if (inc > 0) {
-            resultCursorItem.selectNext();
-        } else {
-            resultCursorItem.selectPrevious();
-        }
-    }
-
-    private void scrollContentType(final int inc) {
-        final int index = browser.selectedContentTypeIndex().get();
-        if (index >= 0 && index < contentTypeNames.length) {
-            int next = index + inc;
-            next = next < 0 ? contentTypeNames.length - 1 : (next >= contentTypeNames.length) ? 0 : next;
-            browser.selectedContentTypeIndex().set(next);
-        }
-    }
-
     public void shiftPressAction(final boolean down) {
         if (browser.exists().get()) {
             browser.cancel();
@@ -109,12 +101,8 @@ public class BrowserLayer extends Layer {
         if (down || !browser.exists().get()) {
             return;
         }
-        if (isSelecting) {
-            browser.shouldAudition().set(true);
-            isSelecting = false;
-        } else {
-            browser.commit();
-        }
+
+        browser.commit();
     }
 
     @Override

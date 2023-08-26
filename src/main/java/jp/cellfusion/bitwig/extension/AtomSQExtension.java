@@ -217,6 +217,7 @@ public class AtomSQExtension extends ControllerExtension {
         mBaseLayer = new Layer(layers, "BASE");
         shiftLayer = new Layer(layers, "SHIFT");
         bindEncoder(mBaseLayer, mainEncoder, this::mainEncoderAction);
+        bindEncoder(shiftLayer, mainEncoder, this::mainEncoderShiftAction);
 
         initBrowserSection();
 
@@ -264,15 +265,14 @@ public class AtomSQExtension extends ControllerExtension {
     }
 
     private void mainEncoderAction(final int dir) {
-        debugLog("mainEncoderAction", "dir:" + dir + ", shift:" + shiftDown.get());
+        if (dir > 0) {
+            cursorTrack.selectNext();
+        } else {
+            cursorTrack.selectPrevious();
+        }
     }
 
-    private void handlePressButtonA(final boolean down) {
-        if (down && shiftDown.get()) {
-            browserLayer.shiftPressAction(down);
-        } else if (down && browserLayer.isActive()) {
-            browserLayer.pressAction(down);
-        }
+    private void mainEncoderShiftAction(final int dir) {
     }
 
 

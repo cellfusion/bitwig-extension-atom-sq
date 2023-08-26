@@ -53,8 +53,8 @@ public class AtomSQExtension extends ControllerExtension {
 
     private CursorTrack cursorTrack;
     private PinnableCursorDevice cursorDevice;
-    private CursorRemoteControlsPage mCursorRemoteControls;
-    private HardwareSurface mHardwareSurface;
+    private CursorRemoteControlsPage cursorRemoteControlsPage;
+    private HardwareSurface hardwareSurface;
     private MidiIn midiIn;
     private MidiOut midiOut;
     private HardwareButton mShiftButton, mUpButton, mDownButton, mLeftButton, mRightButton, mClickCountInButton, mRecordSaveButton, mPlayLoopButton, mStopUndoButton, mSongButton, mInstButton, mEditorButton, mUserButton;
@@ -77,8 +77,8 @@ public class AtomSQExtension extends ControllerExtension {
     private PinnableCursorDevice primaryDevice;
     private NoteInput mNoteInput;
     private PlayingNote[] mPlayingNotes;
-    private DrumPadBank mDrumPadBank;
-    private PinnableCursorClip mCursorClip;
+    private DrumPadBank drumPadBank;
+    private PinnableCursorClip launcherCursorClip;
     private int mPlayingStep;
     private final int[] mStepData = new int[16];
     private int mCurrentPadForSteps;
@@ -134,11 +134,11 @@ public class AtomSQExtension extends ControllerExtension {
 
         cursorDevice = cursorTrack.createCursorDevice("ATOM_SQ", "Atom SQ", 0, CursorDeviceFollowMode.FIRST_INSTRUMENT);
 
-        mCursorRemoteControls = cursorDevice.createCursorRemoteControlsPage(ENCODER_NUM);
-        mCursorRemoteControls.setHardwareLayout(HardwareControlType.ENCODER, ENCODER_NUM);
+        cursorRemoteControlsPage = cursorDevice.createCursorRemoteControlsPage(ENCODER_NUM);
+        cursorRemoteControlsPage.setHardwareLayout(HardwareControlType.ENCODER, ENCODER_NUM);
 
         for (int i = 0; i < ENCODER_NUM; i++) {
-            final RemoteControl parameter = mCursorRemoteControls.getParameter(i);
+            final RemoteControl parameter = cursorRemoteControlsPage.getParameter(i);
             parameter.setIndication(true);
             parameter.markInterested();
             parameter.exists().markInterested();
@@ -154,19 +154,19 @@ public class AtomSQExtension extends ControllerExtension {
         transport.isPlaying().markInterested();
         transport.getPosition().markInterested();
 
-        mCursorClip = cursorTrack.createLauncherCursorClip(16, 1);
-        mCursorClip.color().markInterested();
-        mCursorClip.clipLauncherSlot().color().markInterested();
-        mCursorClip.clipLauncherSlot().isPlaying().markInterested();
-        mCursorClip.clipLauncherSlot().isRecording().markInterested();
-        mCursorClip.clipLauncherSlot().isPlaybackQueued().markInterested();
-        mCursorClip.clipLauncherSlot().isRecordingQueued().markInterested();
-        mCursorClip.clipLauncherSlot().hasContent().markInterested();
-        mCursorClip.getLoopLength().markInterested();
-        mCursorClip.getLoopStart().markInterested();
-        mCursorClip.playingStep().addValueObserver(s -> mPlayingStep = s, -1);
-        mCursorClip.scrollToKey(36);
-        mCursorClip.addNoteStepObserver(d -> {
+        launcherCursorClip = cursorTrack.createLauncherCursorClip(16, 1);
+        launcherCursorClip.color().markInterested();
+        launcherCursorClip.clipLauncherSlot().color().markInterested();
+        launcherCursorClip.clipLauncherSlot().isPlaying().markInterested();
+        launcherCursorClip.clipLauncherSlot().isRecording().markInterested();
+        launcherCursorClip.clipLauncherSlot().isPlaybackQueued().markInterested();
+        launcherCursorClip.clipLauncherSlot().isRecordingQueued().markInterested();
+        launcherCursorClip.clipLauncherSlot().hasContent().markInterested();
+        launcherCursorClip.getLoopLength().markInterested();
+        launcherCursorClip.getLoopStart().markInterested();
+        launcherCursorClip.playingStep().addValueObserver(s -> mPlayingStep = s, -1);
+        launcherCursorClip.scrollToKey(36);
+        launcherCursorClip.addNoteStepObserver(d -> {
             final int x = d.x();
             final int y = d.y();
 
@@ -183,8 +183,8 @@ public class AtomSQExtension extends ControllerExtension {
         });
         cursorTrack.playingNotes().addValueObserver(notes -> mPlayingNotes = notes);
 
-        mDrumPadBank = cursorDevice.createDrumPadBank(PAD_NUM);
-        mDrumPadBank.exists().markInterested();
+        drumPadBank = cursorDevice.createDrumPadBank(PAD_NUM);
+        drumPadBank.exists().markInterested();
 
         cursorTrack.color().markInterested();
 
@@ -215,7 +215,7 @@ public class AtomSQExtension extends ControllerExtension {
 
     @Override
     public void flush() {
-        mHardwareSurface.updateHardware();
+        hardwareSurface.updateHardware();
     }
 
     private void setIsShiftPressed(final boolean value) {
@@ -227,8 +227,7 @@ public class AtomSQExtension extends ControllerExtension {
 
     private void createHardwareSurface() {
         final ControllerHost host = getHost();
-        final HardwareSurface surface = host.createHardwareSurface();
-        mHardwareSurface = surface;
+        hardwareSurface = host.createHardwareSurface();
 
         mShiftButton = createToggleButton("shift", CC_SHIFT, ORANGE);
         mShiftButton.setLabel("Shift");
@@ -283,7 +282,7 @@ public class AtomSQExtension extends ControllerExtension {
 
         // Pads
         for (int i = 0; i < PAD_NUM; i++) {
-            final DrumPad drumPad = mDrumPadBank.getItemAt(i);
+            final DrumPad drumPad = drumPadBank.getItemAt(i);
             drumPad.exists().markInterested();
             drumPad.color().markInterested();
 
@@ -292,7 +291,7 @@ public class AtomSQExtension extends ControllerExtension {
 
         // Encoder
         for (int i = 0; i < ENCODER_NUM; i++) {
-            final RelativeHardwareKnob encoder = createEncoder(mHardwareSurface, midiIn, i);
+            final RelativeHardwareKnob encoder = createEncoder(hardwareSurface, midiIn, i);
             mEncoders[i] = encoder;
         }
 
@@ -300,7 +299,7 @@ public class AtomSQExtension extends ControllerExtension {
     }
 
     private void initHardwareLayout() {
-        final HardwareSurface surface = mHardwareSurface;
+        final HardwareSurface surface = hardwareSurface;
         surface.hardwareElementWithId("shift").setBounds(12.25, 175.25, 12.0, 9.0);
         surface.hardwareElementWithId("up").setBounds(178.25, 21.75, 14.0, 10.0);
         surface.hardwareElementWithId("down").setBounds(178.25, 37.0, 14.0, 10.0);
@@ -327,7 +326,7 @@ public class AtomSQExtension extends ControllerExtension {
             final int controlNumber,
             final Color onLightColor) {
         final HardwareButton button = createButton(id, controlNumber);
-        final OnOffHardwareLight light = mHardwareSurface.createOnOffHardwareLight(id + "_light");
+        final OnOffHardwareLight light = hardwareSurface.createOnOffHardwareLight(id + "_light");
 
         final Color offColor = Color.mix(onLightColor, Color.blackColor(), 0.5);
 
@@ -345,7 +344,7 @@ public class AtomSQExtension extends ControllerExtension {
     }
 
     private HardwareButton createButton(final String id, final int controlNumber) {
-        final HardwareButton button = mHardwareSurface.createHardwareButton(id);
+        final HardwareButton button = hardwareSurface.createHardwareButton(id);
         final MidiExpressions midiExpressions = getHost().midiExpressions();
 
         button.pressedAction().setActionMatcher(midiIn
@@ -357,7 +356,7 @@ public class AtomSQExtension extends ControllerExtension {
     }
 
     private void createPadButton(final int index) {
-        final HardwareButton pad = mHardwareSurface.createHardwareButton("pad" + (index + 1));
+        final HardwareButton pad = hardwareSurface.createHardwareButton("pad" + (index + 1));
         pad.setLabel("Pad " + (index + 1));
         pad.setLabelColor(BLACK);
 
@@ -367,7 +366,7 @@ public class AtomSQExtension extends ControllerExtension {
 
         mPadButtons[index] = pad;
 
-        final MultiStateHardwareLight light = mHardwareSurface
+        final MultiStateHardwareLight light = hardwareSurface
                 .createMultiStateHardwareLight("pad_light" + (index + 1));
 
         light.state().onUpdateHardware(new LightStateSender(0x90, CC_PAD_1 + index));
@@ -393,7 +392,7 @@ public class AtomSQExtension extends ControllerExtension {
         initInstrumentLayer();
         initEditorLayer();
 
-        DebugUtilities.createDebugLayer(layers, mHardwareSurface).activate();
+        DebugUtilities.createDebugLayer(layers, hardwareSurface).activate();
     }
 
     private void initBaseLayer() {
@@ -429,7 +428,7 @@ public class AtomSQExtension extends ControllerExtension {
 
         // encoder
         for (int i = 0; i < ENCODER_NUM; i++) {
-            final Parameter parameter = mCursorRemoteControls.getParameter(i);
+            final Parameter parameter = cursorRemoteControlsPage.getParameter(i);
             final RelativeHardwareKnob encoder = mEncoders[i];
 
             mBaseLayer.bind(encoder, parameter);
@@ -449,9 +448,9 @@ public class AtomSQExtension extends ControllerExtension {
         // On/Off
         mEditorLayer.bindPressed(mDisplayButtons[3], () -> cursorDevice.isEnabled().toggle());
         // Previous Parameter Page
-        mEditorLayer.bindToggle(mDisplayButtons[4], () -> mCursorRemoteControls.selectPrevious(), mCursorRemoteControls.hasPrevious());
+        mEditorLayer.bindToggle(mDisplayButtons[4], () -> cursorRemoteControlsPage.selectPrevious(), cursorRemoteControlsPage.hasPrevious());
         // Next Parameter Page
-        mEditorLayer.bindToggle(mDisplayButtons[5], () -> mCursorRemoteControls.selectNext(), mCursorRemoteControls.hasNext());
+        mEditorLayer.bindToggle(mDisplayButtons[5], () -> cursorRemoteControlsPage.selectNext(), cursorRemoteControlsPage.hasNext());
     }
 
     private void initInstrumentLayer() {
@@ -472,7 +471,7 @@ public class AtomSQExtension extends ControllerExtension {
 
             // TODO mode
             mInstrumentLayer.bindPressed(padButton, () -> {
-                mCursorClip.scrollToKey(36 + padIndex);
+                launcherCursorClip.scrollToKey(36 + padIndex);
                 mCurrentPadForSteps = padIndex;
             });
 
@@ -553,8 +552,8 @@ public class AtomSQExtension extends ControllerExtension {
     }
 
     private Color getDrumPadColor(final int padIndex) {
-        final DrumPad drumPad = mDrumPadBank.getItemAt(padIndex);
-        final boolean padBankExists = mDrumPadBank.exists().get();
+        final DrumPad drumPad = drumPadBank.getItemAt(padIndex);
+        final boolean padBankExists = drumPadBank.exists().get();
         final boolean isOn = !padBankExists || drumPad.exists().get();
 
         if (!isOn)

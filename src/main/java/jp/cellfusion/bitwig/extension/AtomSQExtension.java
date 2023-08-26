@@ -91,6 +91,9 @@ public class AtomSQExtension extends ControllerExtension {
     private BrowserLayer browserLayer;
 
     private RelativeHardwareKnob mainEncoder;
+    private PopupBrowser browser;
+    private DeviceBank deviceBank;
+    private Layer shiftLayer;
 
 
     public Layers getLayers() {
@@ -150,7 +153,10 @@ public class AtomSQExtension extends ControllerExtension {
             scene.exists().markInterested();
         }
 
-        cursorDevice = cursorTrack.createCursorDevice("ATOM_SQ", "Atom SQ", 0, CursorDeviceFollowMode.FIRST_INSTRUMENT);
+        deviceBank = cursorTrack.createDeviceBank(4);
+
+        cursorDevice = cursorTrack.createCursorDevice();
+        cursorDevice.exists().markInterested();
 
         cursorRemoteControlsPage = cursorDevice.createCursorRemoteControlsPage(ENCODER_NUM);
         cursorRemoteControlsPage.setHardwareLayout(HardwareControlType.ENCODER, ENCODER_NUM);
@@ -208,12 +214,11 @@ public class AtomSQExtension extends ControllerExtension {
 
         setUpHardware();
 
-        mBaseLayer = new Layer(layers, "Base");
+        mBaseLayer = new Layer(layers, "BASE");
+        shiftLayer = new Layer(layers, "SHIFT");
         bindEncoder(mBaseLayer, mainEncoder, this::mainEncoderAction);
 
-        browserLayer = new BrowserLayer(this);
-
-        mAlphabetButtons[0].isPressed().addValueObserver(this::handlePressButtonA);
+        initBrowserSection();
 
         initLayers();
 
@@ -226,6 +231,36 @@ public class AtomSQExtension extends ControllerExtension {
 
         // For now just show a popup notification for verification that it is running.
         host.showPopupNotification("Atom SQ Initialized");
+    }
+
+    private void initBrowserSection() {
+        browser = host.createPopupBrowser();
+        browser.exists().markInterested();
+
+        browserLayer = new BrowserLayer(this);
+
+        mBaseLayer.bindPressed(mAlphabetButtons[0], pressed -> {
+            if (browser.exists().get()) {
+                browser.commit();
+            } else {
+                if (cursorDevice.exists().get()) {
+                    cursorDevice.afterDeviceInsertionPoint().browse();
+                } else {
+                    deviceBank.browseToInsertDevice(0);
+                }
+            }
+        });
+        shiftLayer.bindPressed(mAlphabetButtons[0], pressed -> {
+            if (browser.exists().get()) {
+                browser.cancel();
+            } else {
+                if (cursorDevice.exists().get()) {
+                    cursorDevice.replaceDeviceInsertionPoint().browse();
+                } else {
+                    deviceBank.browseToInsertDevice(0);
+                }
+            }
+        });
     }
 
     private void mainEncoderAction(final int dir) {
@@ -257,6 +292,11 @@ public class AtomSQExtension extends ControllerExtension {
 
     private void handleShift(final boolean pressed) {
         shiftDown.set(pressed);
+        if (pressed) {
+            shiftLayer.activate();
+        } else {
+            shiftLayer.deactivate();
+        }
         layers.setGlobalSensitivity(pressed ? 0.1 : 1);
     }
 
@@ -680,6 +720,10 @@ public class AtomSQExtension extends ControllerExtension {
     public void debugLog(final String label, final String message) {
         AtomSQUtils.writeDisplay(6, label, midiOut);
         AtomSQUtils.writeDisplay(7, message, midiOut);
+    }
+
+    public PopupBrowser getBrowser() {
+        return browser;
     }
 
     private class LightStateSender implements Consumer<RgbLightState> {

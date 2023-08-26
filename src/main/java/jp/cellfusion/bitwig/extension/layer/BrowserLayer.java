@@ -19,14 +19,13 @@ public class BrowserLayer extends Layer {
     public BrowserLayer(AtomSQExtension driver) {
         super(driver.getLayers(), "BROWSR_LAYER");
 
-        browser = driver.getHost().createPopupBrowser();
+        browser = driver.getBrowser();
         cursorDevice = driver.getCursorDevice();
         cursorTrack = driver.getCursorTrack();
         cursorDevice.exists().markInterested();
 
         this.driver = driver;
 
-        browser.exists().markInterested();
         browser.exists().addValueObserver(this::browserValueChanged);
         browser.contentTypeNames().addValueObserver(this::contentTypeNamesChanged);
         browser.selectedContentTypeIndex().markInterested();
@@ -39,7 +38,6 @@ public class BrowserLayer extends Layer {
     }
 
     private void handleEncoder(int dir) {
-        driver.debugLog("BrowserLayer", "encoderAction: " + dir + ", shift: " + driver.getShiftDown().get());
         if (driver.getShiftDown().get()) {
             final int index = browser.selectedContentTypeIndex().get();
             if (index >= 0 && index < contentTypeNames.length) {

@@ -4,13 +4,17 @@ import com.bitwig.extension.api.Color;
 import com.bitwig.extension.controller.ControllerExtension;
 import com.bitwig.extension.controller.api.*;
 import com.bitwig.extensions.framework.*;
+import com.bitwig.extensions.framework.values.BooleanValueObject;
 import com.bitwig.extensions.util.NoteInputUtils;
+import jp.cellfusion.bitwig.extension.layer.BrowserLayer;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.function.IntConsumer;
 
 public class AtomSQExtension extends ControllerExtension {
+    private final static int CC_MAIN_ENCODER = 0x1D;
     private final static int CC_ENCODER_1 = 0x0E;
     private final static int CC_ALPHABET_1 = 0x00;
     private final static int CC_PAD_1 = 0x24;
@@ -72,7 +76,7 @@ public class AtomSQExtension extends ControllerExtension {
     private Layer mInstrumentLayer;
     private Layer mEditorLayer;
     private LayerGroup mModeLayerGroup;
-    private boolean mShift;
+    private final BooleanValueObject shiftDown = new BooleanValueObject();
     private Transport transport;
     private PinnableCursorDevice primaryDevice;
     private NoteInput mNoteInput;
@@ -84,6 +88,9 @@ public class AtomSQExtension extends ControllerExtension {
     private int mCurrentPadForSteps;
     private SceneBank mSceneBank;
     private ControllerHost host;
+    private BrowserLayer browserLayer;
+
+    private RelativeHardwareKnob mainEncoder;
 
 
     public Layers getLayers() {
@@ -92,6 +99,14 @@ public class AtomSQExtension extends ControllerExtension {
 
     public PinnableCursorDevice getCursorDevice() {
         return cursorDevice;
+    }
+
+    public RelativeHardwareKnob getMainEncoder() {
+        return mainEncoder;
+    }
+
+    public BooleanValueObject getShiftDown() {
+        return shiftDown;
     }
 
     public PinnableCursorDevice getPrimaryDevice() {
@@ -106,11 +121,14 @@ public class AtomSQExtension extends ControllerExtension {
     @Override
     public void init() {
         host = getHost();
+        host.println("Atom SQ Initialized");
         mApplication = host.createApplication();
         layers = new Layers(this);
 
         midiIn = host.getMidiInPort(0);
         midiOut = host.getMidiOutPort(0);
+
+        hardwareSurface = host.createHardwareSurface();
 
         mNoteInput = midiIn.createNoteInput("Pads", getNoteInputMask());
         mNoteInput.setShouldConsumeEvents(true);
@@ -188,9 +206,12 @@ public class AtomSQExtension extends ControllerExtension {
 
         cursorTrack.color().markInterested();
 
-        createHardwareSurface();
-
+        setUpHardware();
         initLayers();
+
+        browserLayer = new BrowserLayer(this);
+
+        mAlphabetButtons[0].isPressed().addValueObserver(this::handlePressButtonA);
 
         // Turn on Native Mode
         midiOut.sendMidi(0x8f, 0, 127);
@@ -201,6 +222,15 @@ public class AtomSQExtension extends ControllerExtension {
 
         // For now just show a popup notification for verification that it is running.
         host.showPopupNotification("Atom SQ Initialized");
+    }
+
+    private void handlePressButtonA(final boolean down) {
+        debugLog("Button A  isPressed", "down:" + down + ", shift:" + shiftDown.get());
+        if (down && shiftDown.get()) {
+            browserLayer.shiftPressAction(down);
+        } else if (down && browserLayer.isActive()) {
+            browserLayer.pressAction(down);
+        }
     }
 
 
@@ -218,19 +248,15 @@ public class AtomSQExtension extends ControllerExtension {
         hardwareSurface.updateHardware();
     }
 
-    private void setIsShiftPressed(final boolean value) {
-        if (value != mShift) {
-            mShift = value;
-            layers.setGlobalSensitivity(value ? 0.1 : 1);
-        }
+    private void handleShift(final boolean pressed) {
+        shiftDown.set(pressed);
+        layers.setGlobalSensitivity(pressed ? 0.1 : 1);
     }
 
-    private void createHardwareSurface() {
-        final ControllerHost host = getHost();
-        hardwareSurface = host.createHardwareSurface();
-
+    private void setUpHardware() {
         mShiftButton = createToggleButton("shift", CC_SHIFT, ORANGE);
         mShiftButton.setLabel("Shift");
+        mShiftButton.isPressed().addValueObserver(this::handleShift);
 
         // NAV section
         mUpButton = createToggleButton("up", CC_UP, ORANGE);
@@ -290,8 +316,9 @@ public class AtomSQExtension extends ControllerExtension {
         }
 
         // Encoder
+        mainEncoder = createMainEncoder(CC_MAIN_ENCODER);
         for (int i = 0; i < ENCODER_NUM; i++) {
-            final RelativeHardwareKnob encoder = createEncoder(hardwareSurface, midiIn, i);
+            final RelativeHardwareKnob encoder = createEncoder(CC_ENCODER_1 + i);
             mEncoders[i] = encoder;
         }
 
@@ -307,18 +334,30 @@ public class AtomSQExtension extends ControllerExtension {
         surface.hardwareElementWithId("right").setBounds(178.25, 67.25, 14.0, 10.0);
     }
 
-    private RelativeHardwareKnob createEncoder(HardwareSurface hardwareSurface, MidiIn midiIn, int i) {
-        final String id = "encoder" + (i + 1);
+    private RelativeHardwareKnob createMainEncoder(final int ccNumber) {
+        final String id = "MAIN_ENCODER_" + ccNumber;
+        final RelativeHardwareKnob encoder = hardwareSurface.createRelativeHardwareKnob(id);
+        encoder.setAdjustValueMatcher(
+                midiIn.createRelativeSignedBitCCValueMatcher(0, ccNumber, 50));
+        encoder.isUpdatingTargetValue().markInterested();
+        encoder.setLabel(id);
+        //encoder.setLabelPosition(RelativePosition.ABOVE);
+        encoder.setStepSize(1);
 
-        final RelativeHardwareKnob knob = hardwareSurface.createRelativeHardwareKnob(id);
-        knob.setAdjustValueMatcher(
-                midiIn.createRelativeSignedBitCCValueMatcher(0, CC_ENCODER_1 + i, 50));
-        knob.isUpdatingTargetValue().markInterested();
-        knob.setLabel(id);
-        knob.setIndexInGroup(i);
-        knob.setLabelPosition(RelativePosition.ABOVE);
+        return encoder;
+    }
 
-        return knob;
+    private RelativeHardwareKnob createEncoder(final int ccNumber) {
+        final String id = "ENCODER_" + ccNumber;
+
+        final RelativeHardwareKnob encoder = hardwareSurface.createRelativeHardwareKnob(id);
+        encoder.setAdjustValueMatcher(
+                midiIn.createRelativeSignedBitCCValueMatcher(0, ccNumber, 50));
+        encoder.isUpdatingTargetValue().markInterested();
+        encoder.setLabel(id);
+        encoder.setLabelPosition(RelativePosition.ABOVE);
+
+        return encoder;
     }
 
     private HardwareButton createToggleButton(
@@ -396,22 +435,21 @@ public class AtomSQExtension extends ControllerExtension {
     }
 
     private void initBaseLayer() {
-        mBaseLayer.bindIsPressed(mShiftButton, this::setIsShiftPressed);
 
         // transport
         mBaseLayer.bindToggle(mClickCountInButton, transport.isMetronomeEnabled());
         mBaseLayer.bindToggle(mPlayLoopButton, () -> {
-            if (mShift) transport.isArrangerLoopEnabled().toggle();
+            if (shiftDown.get()) transport.isArrangerLoopEnabled().toggle();
             else transport.play();
         }, transport.isPlaying());
 
         mBaseLayer.bindToggle(mStopUndoButton, () -> {
-            if (mShift) mApplication.undo();
+            if (shiftDown.get()) mApplication.undo();
             else transport.stop();
         }, () -> !transport.isPlaying().get());
 
         mBaseLayer.bindToggle(mRecordSaveButton, () -> {
-            if (mShift) save();
+            if (shiftDown.get()) save();
             else transport.isArrangerRecordEnabled().toggle();
         }, transport.isArrangerRecordEnabled());
 
@@ -611,6 +649,21 @@ public class AtomSQExtension extends ControllerExtension {
         masks.add("90????"); // Note Off
         masks.add("D???"); // Channel Pressure
         return masks.toArray(String[]::new);
+    }
+
+    public CursorTrack getCursorTrack() {
+        return cursorTrack;
+    }
+
+    public void bindEncoder(final Layer layer, final RelativeHardwareKnob encoder, final IntConsumer action) {
+        final HardwareActionBindable incAction = host.createAction(() -> action.accept(1), () -> "+");
+        final HardwareActionBindable decAction = host.createAction(() -> action.accept(-1), () -> "-");
+        layer.bind(encoder, host.createRelativeHardwareControlStepTarget(incAction, decAction));
+    }
+
+    public void debugLog(final String label, final String message) {
+        AtomSQUtils.writeDisplay(6, label, midiOut);
+        AtomSQUtils.writeDisplay(7, message, midiOut);
     }
 
     private class LightStateSender implements Consumer<RgbLightState> {

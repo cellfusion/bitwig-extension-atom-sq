@@ -14,31 +14,11 @@ import java.util.function.Consumer;
 import java.util.function.IntConsumer;
 
 public class AtomSQExtension extends ControllerExtension {
-    private final static int CC_MAIN_ENCODER = 0x1D;
-    private final static int CC_ENCODER_1 = 0x0E;
-    private final static int CC_ALPHABET_1 = 0x00;
-    private final static int CC_PAD_1 = 0x24;
-    private final static int CC_DISPLAY_1 = 0x24;
-    private final static int CC_STOP_UNDO = 0x6F;
-    private final static int CC_PLAY_LOOP_TOGGLE = 0x6D;
-    private final static int CC_RECORD_SAVE = 0x6B;
-    private final static int CC_CLICK_COUNT_IN = 0x69;
 
-    private final static int CC_SONG = 0x20;
-    private final static int CC_INST = 0x21;
-    private final static int CC_EDITOR = 0x22;
-    private final static int CC_USER = 0x23;
-
-    private final static int CC_SHIFT = 0x1F;
-    private final static int CC_UP = 0x57;
-    private final static int CC_DOWN = 0x59;
-    private final static int CC_LEFT = 0x5A;
-    private final static int CC_RIGHT = 0x66;
-
-    private final static int ENCODER_NUM = 8;
-    private final static int PAD_NUM = 32;
-    private final static int ALPHABET_NUM = 8;
-    private final static int DISPLAY_NUM = 6;
+    private static final int[] ALPHABET_CC_MAPPING = new int[]{0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
+    private static final int[] DISPLAY_BUTTON_CC_MAPPING = new int[]{0x24, 0x25, 0x26, 0x27, 0x28, 0x29};
+    private static final int[] ENCODER_CC_MAPPING = new int[]{0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15};
+    private static final int[] PAD_CC_MAPPING = new int[]{0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x2D, 0x2E, 0x2F, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E, 0x3F, 0x40, 0x41, 0x42, 0x43};
 
     private static final Color WHITE = Color.fromRGB(1, 1, 1);
 
@@ -62,12 +42,11 @@ public class AtomSQExtension extends ControllerExtension {
     private MidiIn midiIn;
     private MidiOut midiOut;
     private HardwareButton mShiftButton, mUpButton, mDownButton, mLeftButton, mRightButton, mClickCountInButton, mRecordSaveButton, mPlayLoopButton, mStopUndoButton, mSongButton, mInstButton, mEditorButton, mUserButton;
-    private final RelativeHardwareKnob[] mEncoders = new RelativeHardwareKnob[ENCODER_NUM];
-    private final HardwareButton[] mPadButtons = new HardwareButton[PAD_NUM];
-    private final HardwareButton[] mAlphabetButtons = new HardwareButton[ALPHABET_NUM];
-    private final HardwareButton[] mDisplayButtons = new HardwareButton[DISPLAY_NUM];
-    private final MultiStateHardwareLight[] mPadLights = new MultiStateHardwareLight[PAD_NUM];
-
+    private final RelativeHardwareKnob[] mEncoders = new RelativeHardwareKnob[ENCODER_CC_MAPPING.length];
+    private final HardwareButton[] mPadButtons = new HardwareButton[PAD_CC_MAPPING.length];
+    private final HardwareButton[] mAlphabetButtons = new HardwareButton[ALPHABET_CC_MAPPING.length];
+    private final HardwareButton[] mDisplayButtons = new HardwareButton[DISPLAY_BUTTON_CC_MAPPING.length];
+    private final MultiStateHardwareLight[] mPadLights = new MultiStateHardwareLight[PAD_CC_MAPPING.length];
     private Layers layers;
 
     private Application mApplication;
@@ -158,10 +137,10 @@ public class AtomSQExtension extends ControllerExtension {
         cursorDevice = cursorTrack.createCursorDevice();
         cursorDevice.exists().markInterested();
 
-        cursorRemoteControlsPage = cursorDevice.createCursorRemoteControlsPage(ENCODER_NUM);
-        cursorRemoteControlsPage.setHardwareLayout(HardwareControlType.ENCODER, ENCODER_NUM);
+        cursorRemoteControlsPage = cursorDevice.createCursorRemoteControlsPage(ENCODER_CC_MAPPING.length);
+        cursorRemoteControlsPage.setHardwareLayout(HardwareControlType.ENCODER, ENCODER_CC_MAPPING.length);
 
-        for (int i = 0; i < ENCODER_NUM; i++) {
+        for (int i = 0; i < ENCODER_CC_MAPPING.length; i++) {
             final RemoteControl parameter = cursorRemoteControlsPage.getParameter(i);
             parameter.setIndication(true);
             parameter.markInterested();
@@ -207,7 +186,7 @@ public class AtomSQExtension extends ControllerExtension {
         });
         cursorTrack.playingNotes().addValueObserver(notes -> mPlayingNotes = notes);
 
-        drumPadBank = cursorDevice.createDrumPadBank(PAD_NUM);
+        drumPadBank = cursorDevice.createDrumPadBank(PAD_CC_MAPPING.length);
         drumPadBank.exists().markInterested();
 
         cursorTrack.color().markInterested();
@@ -301,71 +280,71 @@ public class AtomSQExtension extends ControllerExtension {
     }
 
     private void setUpHardware() {
-        mShiftButton = createToggleButton("shift", CC_SHIFT, ORANGE);
+        mShiftButton = createToggleButton("shift", CcAssignment.SHIFT.getCcNr(), ORANGE);
         mShiftButton.setLabel("Shift");
         mShiftButton.isPressed().addValueObserver(this::handleShift);
 
         // NAV section
-        mUpButton = createToggleButton("up", CC_UP, ORANGE);
+        mUpButton = createToggleButton("up", CcAssignment.ARROW_UP.getCcNr(), ORANGE);
         mUpButton.setLabel("Up");
-        mDownButton = createToggleButton("down", CC_DOWN, ORANGE);
+        mDownButton = createToggleButton("down", CcAssignment.ARROW_DOWN.getCcNr(), ORANGE);
         mDownButton.setLabel("Down");
-        mLeftButton = createToggleButton("left", CC_LEFT, ORANGE);
+        mLeftButton = createToggleButton("left", CcAssignment.LEFT.getCcNr(), ORANGE);
         mLeftButton.setLabel("Left");
-        mRightButton = createToggleButton("right", CC_RIGHT, ORANGE);
+        mRightButton = createToggleButton("right", CcAssignment.RIGHT.getCcNr(), ORANGE);
         mRightButton.setLabel("Right");
 
         // Mode section
-        mSongButton = createToggleButton("song", CC_SONG, BLUE);
+        mSongButton = createToggleButton("song", CcAssignment.MODE_SONG.getCcNr(), BLUE);
         mSongButton.setLabel("Song");
-        mInstButton = createToggleButton("inst", CC_INST, BLUE);
+        mInstButton = createToggleButton("inst", CcAssignment.MODE_INST.getCcNr(), BLUE);
         mInstButton.setLabel("Inst");
-        mEditorButton = createToggleButton("editor", CC_EDITOR, BLUE);
+        mEditorButton = createToggleButton("editor", CcAssignment.MODE_EDITOR.getCcNr(), BLUE);
         mEditorButton.setLabel("Editor");
-        mUserButton = createToggleButton("user", CC_USER, BLUE);
+        mUserButton = createToggleButton("user", CcAssignment.MODE_USER.getCcNr(), BLUE);
         mUserButton.setLabel("User");
 
 
         // TRANS section
-        mClickCountInButton = createToggleButton("click_count_in", CC_CLICK_COUNT_IN, BLUE);
+        mClickCountInButton = createToggleButton("click_count_in", CcAssignment.TAPMETRO.getCcNr(), BLUE);
         mClickCountInButton.setLabel("Click\nCount in");
-        mRecordSaveButton = createToggleButton("record_save", CC_RECORD_SAVE, RED);
+        mRecordSaveButton = createToggleButton("record_save", CcAssignment.RECORD.getCcNr(), RED);
         mRecordSaveButton.setLabel("Record\nSave");
-        mPlayLoopButton = createToggleButton("play_loop", CC_PLAY_LOOP_TOGGLE, GREEN);
+        mPlayLoopButton = createToggleButton("play_loop", CcAssignment.PLAY.getCcNr(), GREEN);
         mPlayLoopButton.setLabel("Play\nLoop");
-        mStopUndoButton = createToggleButton("stop_undo", CC_STOP_UNDO, ORANGE);
+        mStopUndoButton = createToggleButton("stop_undo", CcAssignment.STOP.getCcNr(), ORANGE);
         mStopUndoButton.setLabel("Stop\nUndo");
 
 
         // Alphabet section
-        for (int i = 0; i < ALPHABET_NUM; i++) {
-            HardwareButton button = createButton("alphabet" + (i + 1), CC_ALPHABET_1 + i);
+        for (int i = 0; i < ALPHABET_CC_MAPPING.length; i++) {
+            HardwareButton button = createButton("alphabet" + (i + 1), ALPHABET_CC_MAPPING[i]);
             button.setLabel("Alphabet " + (i + 1));
 
             mAlphabetButtons[i] = button;
         }
 
         // Display section
-        for (int i = 0; i < DISPLAY_NUM; i++) {
-            HardwareButton button = createToggleButton("display" + (i + 1), CC_DISPLAY_1 + i, ORANGE);
+        for (int i = 0; i < DISPLAY_BUTTON_CC_MAPPING.length; i++) {
+            HardwareButton button = createToggleButton("display" + (i + 1), DISPLAY_BUTTON_CC_MAPPING[i], ORANGE);
             button.setLabel("Display " + (i + 1));
 
             mDisplayButtons[i] = button;
         }
 
         // Pads
-        for (int i = 0; i < PAD_NUM; i++) {
+        for (int i = 0; i < PAD_CC_MAPPING.length; i++) {
             final DrumPad drumPad = drumPadBank.getItemAt(i);
             drumPad.exists().markInterested();
             drumPad.color().markInterested();
 
-            createPadButton(i);
+            createPadButton(i, PAD_CC_MAPPING[i]);
         }
 
         // Encoder
-        mainEncoder = createMainEncoder(CC_MAIN_ENCODER);
-        for (int i = 0; i < ENCODER_NUM; i++) {
-            final RelativeHardwareKnob encoder = createEncoder(CC_ENCODER_1 + i);
+        mainEncoder = createMainEncoder(CcAssignment.MAIN_ENCODER.getCcNr());
+        for (int i = 0; i < ENCODER_CC_MAPPING.length; i++) {
+            final RelativeHardwareKnob encoder = createEncoder(ENCODER_CC_MAPPING[i]);
             mEncoders[i] = encoder;
         }
 
@@ -451,21 +430,20 @@ public class AtomSQExtension extends ControllerExtension {
         return button;
     }
 
-    private void createPadButton(final int index) {
+    private void createPadButton(final int index, final int ccNumber) {
         final HardwareButton pad = hardwareSurface.createHardwareButton("pad" + (index + 1));
         pad.setLabel("Pad " + (index + 1));
         pad.setLabelColor(BLACK);
 
-        final int note = CC_PAD_1 + index;
-        pad.pressedAction().setPressureActionMatcher(midiIn.createNoteOnVelocityValueMatcher(0, note));
-        pad.releasedAction().setActionMatcher(midiIn.createNoteOffActionMatcher(0, note));
+        pad.pressedAction().setPressureActionMatcher(midiIn.createNoteOnVelocityValueMatcher(0, ccNumber));
+        pad.releasedAction().setActionMatcher(midiIn.createNoteOffActionMatcher(0, ccNumber));
 
         mPadButtons[index] = pad;
 
         final MultiStateHardwareLight light = hardwareSurface
                 .createMultiStateHardwareLight("pad_light" + (index + 1));
 
-        light.state().onUpdateHardware(new LightStateSender(0x90, CC_PAD_1 + index));
+        light.state().onUpdateHardware(new LightStateSender(0x90, ccNumber));
 
         light.setColorToStateFunction(RgbLightState::new);
 
@@ -521,7 +499,7 @@ public class AtomSQExtension extends ControllerExtension {
         mBaseLayer.bindToggle(mRightButton, cursorDevice.selectNextAction(), cursorDevice.hasNext());
 
         // encoder
-        for (int i = 0; i < ENCODER_NUM; i++) {
+        for (int i = 0; i < ENCODER_CC_MAPPING.length; i++) {
             final Parameter parameter = cursorRemoteControlsPage.getParameter(i);
             final RelativeHardwareKnob encoder = mEncoders[i];
 
@@ -558,7 +536,7 @@ public class AtomSQExtension extends ControllerExtension {
                     fullLevelIsOn.getAsBoolean() ? NoteInputUtils.FULL_VELOCITY : NoteInputUtils.NORMAL_VELOCITY);
         }, fullLevelIsOn);
 
-        for (int i = 0; i < PAD_NUM; i++) {
+        for (int i = 0; i < PAD_CC_MAPPING.length; i++) {
             final HardwareButton padButton = mPadButtons[i];
 
             final int padIndex = i;

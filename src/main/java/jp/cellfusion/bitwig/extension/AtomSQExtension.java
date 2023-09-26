@@ -86,6 +86,11 @@ public class AtomSQExtension extends ControllerExtension {
         return mainEncoder;
     }
 
+    public RelativeHardwareKnob getEncoder(int index) {
+        assert index >= 0 && index < mEncoders.length;
+        return mEncoders[index];
+    }
+
     public BooleanValueObject getShiftDown() {
         return shiftDown;
     }
@@ -148,7 +153,6 @@ public class AtomSQExtension extends ControllerExtension {
 
             parameter.name().markInterested();
             parameter.name().addValueObserver(newValue -> {
-//            mShouldFlushSysex = true;
                 getHost().requestFlush();
             });
         }
@@ -243,6 +247,7 @@ public class AtomSQExtension extends ControllerExtension {
         });
     }
 
+    // track select
     private void mainEncoderAction(final int dir) {
         if (dir > 0) {
             cursorTrack.selectNext();

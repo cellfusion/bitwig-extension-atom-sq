@@ -10,6 +10,7 @@ import com.bitwig.extensions.framework.values.BooleanValueObject;
 import jp.cellfusion.bitwig.extension.buttons.RgbButton;
 import jp.cellfusion.bitwig.extension.layer.BrowserLayer;
 import jp.cellfusion.bitwig.extension.layer.DrumLayer;
+import jp.cellfusion.bitwig.extension.layer.KeyboardLayer;
 import jp.cellfusion.bitwig.extension.utils.LogUtil;
 
 import java.util.ArrayList;
@@ -74,6 +75,7 @@ public class AtomSQExtension extends ControllerExtension {
     private DeviceBank deviceBank;
     private Layer shiftLayer;
     private DrumLayer mDrumLayey;
+    private KeyboardLayer mKeyboardLayer;
 
 
     public Layers getLayers() {
@@ -225,6 +227,7 @@ public class AtomSQExtension extends ControllerExtension {
         initBrowserSection();
 
         mDrumLayey = new DrumLayer(this);
+        mKeyboardLayer = new KeyboardLayer(this);
 
         // primary device が drum machine だったら drum layer を表示する
         primaryDevice = cursorTrack.createCursorDevice("Primary", "Primary", 0, CursorDeviceFollowMode.FIRST_INSTRUMENT);

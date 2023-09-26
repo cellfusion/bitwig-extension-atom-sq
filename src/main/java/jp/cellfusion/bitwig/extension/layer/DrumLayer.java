@@ -17,7 +17,7 @@ public class DrumLayer extends Layer {
 
         this.driver = driver;
 
-        // drumpad
+        // drum pad
         final HardwareButton[] padButtons = driver.getPadButtons();
         for (int i = 0; i < padButtons.length; i++) {
             final int padIndex = i;
@@ -38,16 +38,12 @@ public class DrumLayer extends Layer {
 
         Color drumPadColor;
 
-        if (!padBankExists) {
-            drumPadColor = driver.getCursorTrack().color().get();
-        } else {
-            final Color sourceDrumPadColor = drumPad.color().get();
-            final double red = sourceDrumPadColor.getRed() * darken;
-            final double green = sourceDrumPadColor.getGreen() * darken;
-            final double blue = sourceDrumPadColor.getBlue() * darken;
+        final Color sourceDrumPadColor = drumPad.color().get();
+        final double red = sourceDrumPadColor.getRed() * darken;
+        final double green = sourceDrumPadColor.getGreen() * darken;
+        final double blue = sourceDrumPadColor.getBlue() * darken;
 
-            drumPadColor = Color.fromRGB(red, green, blue);
-        }
+        drumPadColor = Color.fromRGB(red, green, blue);
 
         final int playing = velocityForPlayingNote(padIndex);
 

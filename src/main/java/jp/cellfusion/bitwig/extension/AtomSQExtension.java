@@ -229,14 +229,17 @@ public class AtomSQExtension extends ControllerExtension {
         mDrumLayer = new DrumLayer(this);
         mKeyboardLayer = new KeyboardLayer(this);
 
-        // primary device が drum machine だったら drum layer を表示する
-        primaryDevice = cursorTrack.createCursorDevice("Primary", "Primary", 0, CursorDeviceFollowMode.FIRST_INSTRUMENT);
+        // TODO primary device が drum machine だったら drum layer を表示する
+        primaryDevice = cursorTrack.createCursorDevice("DrumDetection", "Pad Device", 0, CursorDeviceFollowMode.FIRST_INSTRUMENT);
         primaryDevice.exists().markInterested();
+        primaryDevice.hasDrumPads().markInterested();
         primaryDevice.hasDrumPads().addValueObserver(v -> {
             if (v) {
                 mDrumLayer.activate();
+                mKeyboardLayer.deactivate();
             } else {
                 mDrumLayer.deactivate();
+                mKeyboardLayer.activate();
             }
         });
 

@@ -9,6 +9,7 @@ import com.bitwig.extensions.framework.Layers;
 import com.bitwig.extensions.framework.values.BooleanValueObject;
 import jp.cellfusion.bitwig.extension.buttons.RgbButton;
 import jp.cellfusion.bitwig.extension.layer.BrowserLayer;
+import jp.cellfusion.bitwig.extension.utils.LogUtil;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -101,7 +102,8 @@ public class AtomSQExtension extends ControllerExtension {
     @Override
     public void init() {
         host = getHost();
-        host.println("Atom SQ Initialized");
+        LogUtil.init(host);
+        LogUtil.println("Atom SQ Initialized");
         mApplication = host.createApplication();
         layers = new Layers(this);
 

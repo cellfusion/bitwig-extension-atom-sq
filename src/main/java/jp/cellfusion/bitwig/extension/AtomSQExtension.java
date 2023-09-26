@@ -74,7 +74,7 @@ public class AtomSQExtension extends ControllerExtension {
     private PopupBrowser browser;
     private DeviceBank deviceBank;
     private Layer shiftLayer;
-    private DrumLayer mDrumLayey;
+    private DrumLayer mDrumLayer;
     private KeyboardLayer mKeyboardLayer;
 
 
@@ -226,7 +226,7 @@ public class AtomSQExtension extends ControllerExtension {
 
         initBrowserSection();
 
-        mDrumLayey = new DrumLayer(this);
+        mDrumLayer = new DrumLayer(this);
         mKeyboardLayer = new KeyboardLayer(this);
 
         // primary device が drum machine だったら drum layer を表示する
@@ -234,9 +234,9 @@ public class AtomSQExtension extends ControllerExtension {
         primaryDevice.exists().markInterested();
         primaryDevice.hasDrumPads().addValueObserver(v -> {
             if (v) {
-                mDrumLayey.activate();
+                mDrumLayer.activate();
             } else {
-                mDrumLayey.deactivate();
+                mDrumLayer.deactivate();
             }
         });
 

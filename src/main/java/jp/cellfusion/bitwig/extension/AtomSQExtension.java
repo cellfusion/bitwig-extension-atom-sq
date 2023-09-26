@@ -382,13 +382,7 @@ public class AtomSQExtension extends ControllerExtension {
         final String id = "ENCODER_" + ccNumber;
 
         final RelativeHardwareKnob encoder = hardwareSurface.createRelativeHardwareKnob(id);
-        final RelativeHardwareValueMatcher stepUpMatcher = midiIn.createRelativeValueMatcher(
-                "(status == 176 && data1 == " + ccNumber + " && data2 > 64)", 1);
-        final RelativeHardwareValueMatcher stepDownMatcher = midiIn.createRelativeValueMatcher(
-                "(status == 176 && data1 == " + ccNumber + " && data2 < 63)", -1);
-        final RelativeHardwareValueMatcher matcher = host.createOrRelativeHardwareValueMatcher(stepDownMatcher,
-                stepUpMatcher);
-        encoder.setAdjustValueMatcher(matcher);
+        encoder.setAdjustValueMatcher(midiIn.createRelativeSignedBitCCValueMatcher(0, ccNumber, 50));
         encoder.isUpdatingTargetValue().markInterested();
         encoder.setLabel(id);
         encoder.setLabelPosition(RelativePosition.ABOVE);

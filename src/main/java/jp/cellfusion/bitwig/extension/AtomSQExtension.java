@@ -9,6 +9,7 @@ import com.bitwig.extensions.framework.Layers;
 import com.bitwig.extensions.framework.values.BooleanValueObject;
 import jp.cellfusion.bitwig.extension.buttons.RgbButton;
 import jp.cellfusion.bitwig.extension.layer.BrowserLayer;
+import jp.cellfusion.bitwig.extension.layer.DrumLayer;
 import jp.cellfusion.bitwig.extension.utils.LogUtil;
 
 import java.util.ArrayList;
@@ -72,6 +73,7 @@ public class AtomSQExtension extends ControllerExtension {
     private PopupBrowser browser;
     private DeviceBank deviceBank;
     private Layer shiftLayer;
+    private DrumLayer mDrumLayey;
 
 
     public Layers getLayers() {
@@ -94,6 +96,18 @@ public class AtomSQExtension extends ControllerExtension {
     public HardwareButton getAlphabetButton(int index) {
         assert index >= 0 && index < mAlphabetButtons.length;
         return mAlphabetButtons[index];
+    }
+
+    public HardwareButton[] getAlphabetButtons() {
+        return mAlphabetButtons;
+    }
+
+    public HardwareButton[] getPadButtons() {
+        return mPadButtons;
+    }
+
+    public PlayingNote[] getPlayingNotes() {
+        return mPlayingNotes;
     }
 
     public BooleanValueObject getShiftDown() {
@@ -127,6 +141,7 @@ public class AtomSQExtension extends ControllerExtension {
 
         cursorTrack = host.createCursorTrack(0, LAUNCHER_SCENES);
         cursorTrack.arm().markInterested();
+
         mSceneBank = host.createSceneBank(LAUNCHER_SCENES);
         for (int s = 0; s < LAUNCHER_SCENES; s++) {
             final ClipLauncherSlot slot = cursorTrack.clipLauncherSlotBank().getItemAt(s);
@@ -208,6 +223,19 @@ public class AtomSQExtension extends ControllerExtension {
         bindEncoder(shiftLayer, mainEncoder, this::mainEncoderShiftAction);
 
         initBrowserSection();
+
+        mDrumLayey = new DrumLayer(this);
+
+        // primary device が drum machine だったら drum layer を表示する
+        primaryDevice = cursorTrack.createCursorDevice("Primary", "Primary", 0, CursorDeviceFollowMode.FIRST_INSTRUMENT);
+        primaryDevice.exists().markInterested();
+        primaryDevice.hasDrumPads().addValueObserver(v -> {
+            if (v) {
+                mDrumLayey.activate();
+            } else {
+                mDrumLayey.deactivate();
+            }
+        });
 
         initLayers();
 
@@ -496,6 +524,7 @@ public class AtomSQExtension extends ControllerExtension {
             mBaseLayer.bind(encoder, parameter);
         }
 
+
         mBaseLayer.activate();
     }
 
@@ -529,60 +558,6 @@ public class AtomSQExtension extends ControllerExtension {
         if (saveAction != null) {
             saveAction.invoke();
         }
-    }
-
-    private Color getDrumPadColor(final int padIndex) {
-        final DrumPad drumPad = drumPadBank.getItemAt(padIndex);
-        final boolean padBankExists = drumPadBank.exists().get();
-        final boolean isOn = !padBankExists || drumPad.exists().get();
-
-        if (!isOn)
-            return null;
-
-        final double darken = 0.7;
-
-        Color drumPadColor;
-
-        if (!padBankExists) {
-            drumPadColor = cursorTrack.color().get();
-        } else {
-            final Color sourceDrumPadColor = drumPad.color().get();
-            final double red = sourceDrumPadColor.getRed() * darken;
-            final double green = sourceDrumPadColor.getGreen() * darken;
-            final double blue = sourceDrumPadColor.getBlue() * darken;
-
-            drumPadColor = Color.fromRGB(red, green, blue);
-        }
-
-        final int playing = velocityForPlayingNote(padIndex);
-
-        if (playing > 0) {
-            return mixColorWithWhite(drumPadColor, playing);
-        }
-
-        return drumPadColor;
-    }
-
-    private int velocityForPlayingNote(final int padIndex) {
-        if (mPlayingNotes != null) {
-            for (final PlayingNote playingNote : mPlayingNotes) {
-                if (playingNote.pitch() == 36 + padIndex) {
-                    return playingNote.velocity();
-                }
-            }
-        }
-
-        return 0;
-    }
-
-
-    private Color mixColorWithWhite(final Color color, final int velocity) {
-        final float x = velocity / 127.f;
-        final double red = color.getRed() * (1 - x) + x;
-        final double green = color.getGreen() * (1 - x) + x;
-        final double blue = color.getBlue() * (1 - x) + x;
-
-        return Color.fromRGB(red, green, blue);
     }
 
     private String[] getNoteInputMask() {
@@ -620,6 +595,10 @@ public class AtomSQExtension extends ControllerExtension {
         return hardwareSurface;
     }
 
+    public DrumPadBank getDrumPadBank() {
+        return drumPadBank;
+    }
+
     public void updatePadLed(final RgbButton button) {
         final RgbLed state = (RgbLed) button.getLight().state().currentValue();
         if (state != null) {
@@ -628,6 +607,7 @@ public class AtomSQExtension extends ControllerExtension {
             midiOut.sendMidi(button.getMidiStatus(), button.getMidiDataNr(), 0);
         }
     }
+
 
     private class LightStateSender implements Consumer<RgbLightState> {
         protected LightStateSender(final int statusStart, final int data1) {

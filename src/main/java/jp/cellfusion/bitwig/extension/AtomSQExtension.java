@@ -91,6 +91,11 @@ public class AtomSQExtension extends ControllerExtension {
         return mEncoders[index];
     }
 
+    public HardwareButton getAlphabetButton(int index) {
+        assert index >= 0 && index < mAlphabetButtons.length;
+        return mAlphabetButtons[index];
+    }
+
     public BooleanValueObject getShiftDown() {
         return shiftDown;
     }
@@ -323,7 +328,8 @@ public class AtomSQExtension extends ControllerExtension {
 
         // Alphabet section
         for (int i = 0; i < ALPHABET_CC_MAPPING.length; i++) {
-            HardwareButton button = createButton("alphabet" + (i + 1), ALPHABET_CC_MAPPING[i]);
+            HardwareButton button = createToggleButton("alphabet" + (i + 1), ALPHABET_CC_MAPPING[i], ORANGE);
+            button.isPressed().markInterested();
             button.setLabel("Alphabet " + (i + 1));
 
             mAlphabetButtons[i] = button;

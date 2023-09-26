@@ -15,8 +15,10 @@ public class BrowserLayer extends Layer {
     private final CursorBrowserFilterItem categoryItem;
     private final CursorBrowserFilterItem creatorItem;
     private final CursorBrowserFilterItem tagItem;
+    private final CursorBrowserFilterItem locationItem;
     private int currentHits = 0;
     private String selectedContentType = "";
+    private String locationElement = "";
     private String selectedElement = "";
     private String categoryElement = "";
     private String creatorElement = "";
@@ -24,7 +26,6 @@ public class BrowserLayer extends Layer {
     private String fileTypeElement = "";
     private String deviceElement = "";
     private String[] contentTypeNames;
-    private String currentContentType = "";
 
 
     public BrowserLayer(AtomSQExtension driver) {
@@ -46,13 +47,11 @@ public class BrowserLayer extends Layer {
             selectedContentType = content;
         });
 
-
-        // deviceItem
-        deviceItem = (CursorBrowserFilterItem) browser.deviceColumn().createCursorItem();
-        deviceItem.hitCount().markInterested();
-        deviceItem.name().addValueObserver(v -> {
-            deviceElement = v.trim();
-            currentHits = deviceItem.hitCount().get();
+        locationItem = (CursorBrowserFilterItem) browser.locationColumn().createCursorItem();
+        locationItem.hitCount().markInterested();
+        locationItem.name().addValueObserver(v -> {
+            locationElement = v.trim();
+            currentHits = locationItem.hitCount().get();
         });
 
         fileTypeItem = (CursorBrowserFilterItem) browser.fileTypeColumn().createCursorItem();
@@ -76,6 +75,13 @@ public class BrowserLayer extends Layer {
             currentHits = creatorItem.hitCount().get();
         });
 
+        deviceItem = (CursorBrowserFilterItem) browser.deviceColumn().createCursorItem();
+        deviceItem.hitCount().markInterested();
+        deviceItem.name().addValueObserver(v -> {
+            deviceElement = v.trim();
+            currentHits = deviceItem.hitCount().get();
+        });
+
         tagItem = (CursorBrowserFilterItem) browser.tagColumn().createCursorItem();
         tagItem.hitCount().markInterested();
         tagItem.name().addValueObserver(v -> {
@@ -90,12 +96,6 @@ public class BrowserLayer extends Layer {
 
         // select
         driver.bindEncoder(this, driver.getMainEncoder(), this::handleEncoder);
-        driver.bindEncoder(this, driver.getEncoder(0), this::scrollContentType);
-        driver.bindEncoder(this, driver.getEncoder(1), this::scrollFileType);
-        driver.bindEncoder(this, driver.getEncoder(2), this::scrollDevice);
-        driver.bindEncoder(this, driver.getEncoder(3), this::scrollCategory);
-        driver.bindEncoder(this, driver.getEncoder(4), this::scrollTag);
-        driver.bindEncoder(this, driver.getEncoder(5), this::scrollCreator);
     }
 
 
@@ -104,51 +104,56 @@ public class BrowserLayer extends Layer {
         browser.selectedContentTypeIndex().set(v + increment);
     }
 
-    private void scrollFileType(final int increment) {
-        if (increment > 0) {
-            fileTypeItem.selectNext();
-        } else {
-            fileTypeItem.selectPrevious();
-        }
-    }
-
-    private void scrollDevice(final int increment) {
-        if (increment > 0) {
-            deviceItem.selectNext();
-        } else {
-            deviceItem.selectPrevious();
-        }
-    }
-
-    private void scrollCategory(final int increment) {
-        if (increment > 0) {
-            categoryItem.selectNext();
-        } else {
-            categoryItem.selectPrevious();
-        }
-    }
-
-    private void scrollTag(final int increment) {
-        if (increment > 0) {
-            tagItem.selectNext();
-        } else {
-            tagItem.selectPrevious();
-        }
-    }
-
-    private void scrollCreator(final int increment) {
-        if (increment > 0) {
-            creatorItem.selectNext();
-        } else {
-            creatorItem.selectPrevious();
-        }
-    }
-
     private void handleEncoder(final int increment) {
-        if (increment > 0) {
-            browser.selectNextFile();
+        // B Button Pressed
+        if (driver.getAlphabetButton(1).isPressed().get()) {
+            if (increment > 0) {
+                locationItem.selectNext();
+            } else {
+                locationItem.selectPrevious();
+            }
+
+            // C Button Pressed
+        } else if (driver.getAlphabetButton(2).isPressed().get()) {
+            if (increment > 0) {
+                fileTypeItem.selectNext();
+            } else {
+                fileTypeItem.selectPrevious();
+            }
+            // D Button Pressed
+        } else if (driver.getAlphabetButton(3).isPressed().get()) {
+            if (increment > 0) {
+                categoryItem.selectNext();
+            } else {
+                categoryItem.selectPrevious();
+            }
+            // E Button Pressed
+        } else if (driver.getAlphabetButton(4).isPressed().get()) {
+            if (increment > 0) {
+                creatorItem.selectNext();
+            } else {
+                creatorItem.selectPrevious();
+            }
+            // F Button Pressed
+        } else if (driver.getAlphabetButton(5).isPressed().get()) {
+            if (increment > 0) {
+                deviceItem.selectNext();
+            } else {
+                deviceItem.selectPrevious();
+            }
+            // G Button Pressed
+        } else if (driver.getAlphabetButton(6).isPressed().get()) {
+            if (increment > 0) {
+                tagItem.selectNext();
+            } else {
+                tagItem.selectPrevious();
+            }
         } else {
-            browser.selectPreviousFile();
+            if (increment > 0) {
+                browser.selectNextFile();
+            } else {
+                browser.selectPreviousFile();
+            }
         }
     }
 
@@ -158,13 +163,6 @@ public class BrowserLayer extends Layer {
 
     private void browserValueChanged(boolean exists) {
         setIsActive(exists);
-    }
-
-    private void selectedChanged(int selected) {
-        if (selected < contentTypeNames.length) {
-            currentContentType = contentTypeNames[selected];
-            final boolean selectionExists = resultCursorItem.exists().get();
-        }
     }
 
     public void shiftPressAction(final boolean down) {

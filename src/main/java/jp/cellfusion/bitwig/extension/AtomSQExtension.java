@@ -39,15 +39,12 @@ public class AtomSQExtension extends ControllerExtension {
     private static final Color BLUE = Color.fromRGB(0, 0, 1);
     private static final int LAUNCHER_SCENES = 16;
 
-    private CursorTrack cursorTrack;
-    private PinnableCursorDevice cursorDevice;
-    private CursorRemoteControlsPage cursorRemoteControlsPage;
+    public CursorRemoteControlsPage cursorRemoteControlsPage;
     private HardwareSurface hardwareSurface;
 
     private Application mApplication;
     private final BooleanValueObject shiftDown = new BooleanValueObject();
     public Transport transport;
-    private PinnableCursorDevice primaryDevice;
     private NoteInput mNoteInput;
     private PlayingNote[] mPlayingNotes;
     private DrumPadBank drumPadBank;
@@ -58,8 +55,11 @@ public class AtomSQExtension extends ControllerExtension {
     private SceneBank mSceneBank;
     private ControllerHost host;
 
-    private PopupBrowser browser;
-    private DeviceBank deviceBank;
+    public PopupBrowser browser;
+    public CursorTrack cursorTrack;
+    public PinnableCursorDevice cursorDevice;
+    public DeviceBank deviceBank;
+    private PinnableCursorDevice primaryDevice;
 
     // encoder
     private RelativeHardwareKnob mainEncoder;
@@ -70,7 +70,7 @@ public class AtomSQExtension extends ControllerExtension {
     public MidiOut midiOut;
 
     // buttons
-    public HardwareButton mShiftButton, mUpButton, mDownButton, mLeftButton, mRightButton, mClickCountInButton, mRecordSaveButton, mPlayLoopButton, mStopUndoButton, mSongButton, mInstButton, mEditorButton, mUserButton;
+    public HardwareButton mShiftButton, mUpButton, mDownButton, mNavLeftButton, mNavRightButton, mClickCountInButton, mRecordSaveButton, mPlayLoopButton, mStopUndoButton, mSongButton, mInstButton, mEditorButton, mUserButton, mLeftButton, mRightButton;
     public final HardwareButton[] mPadButtons = new HardwareButton[PAD_CC_MAPPING.length];
     public final HardwareButton[] mAlphabetButtons = new HardwareButton[ALPHABET_CC_MAPPING.length];
     public final HardwareButton[] mDisplayButtons = new HardwareButton[DISPLAY_BUTTON_CC_MAPPING.length];
@@ -79,7 +79,6 @@ public class AtomSQExtension extends ControllerExtension {
     // layers
     public Layers layers;
     private Layer mBaseLayer;
-    private BrowserLayer browserLayer;
     private Layer shiftLayer;
     private DrumLayer mDrumLayer;
     private KeyboardLayer mKeyboardLayer;
@@ -228,6 +227,9 @@ public class AtomSQExtension extends ControllerExtension {
 
         cursorTrack.color().markInterested();
 
+        browser = host.createPopupBrowser();
+        browser.exists().markInterested();
+
         setUpHardware();
 
         // Turn on Native Mode
@@ -236,9 +238,6 @@ public class AtomSQExtension extends ControllerExtension {
         mBaseLayer = new Layer(layers, "BASE");
         shiftLayer = new Layer(layers, "SHIFT");
         bindEncoder(mBaseLayer, mainEncoder, this::mainEncoderAction);
-        bindEncoder(shiftLayer, mainEncoder, this::mainEncoderShiftAction);
-
-        initBrowserSection();
 
         mDrumLayer = new DrumLayer(this);
         mKeyboardLayer = new KeyboardLayer(this);
@@ -263,36 +262,6 @@ public class AtomSQExtension extends ControllerExtension {
         host.showPopupNotification("Atom SQ Initialized");
     }
 
-    private void initBrowserSection() {
-        browser = host.createPopupBrowser();
-        browser.exists().markInterested();
-
-        browserLayer = new BrowserLayer(this);
-
-        mBaseLayer.bindPressed(mAlphabetButtons[0], pressed -> {
-            if (browser.exists().get()) {
-                browser.commit();
-            } else {
-                if (cursorDevice.exists().get()) {
-                    cursorDevice.afterDeviceInsertionPoint().browse();
-                } else {
-                    deviceBank.browseToInsertDevice(0);
-                }
-            }
-        });
-        shiftLayer.bindPressed(mAlphabetButtons[0], pressed -> {
-            if (browser.exists().get()) {
-                browser.cancel();
-            } else {
-                if (cursorDevice.exists().get()) {
-                    cursorDevice.replaceDeviceInsertionPoint().browse();
-                } else {
-                    deviceBank.browseToInsertDevice(0);
-                }
-            }
-        });
-    }
-
     // track select
     private void mainEncoderAction(final int dir) {
         if (dir > 0) {
@@ -300,9 +269,6 @@ public class AtomSQExtension extends ControllerExtension {
         } else {
             cursorTrack.selectPrevious();
         }
-    }
-
-    private void mainEncoderShiftAction(final int dir) {
     }
 
 
@@ -340,10 +306,15 @@ public class AtomSQExtension extends ControllerExtension {
         mUpButton.setLabel("Up");
         mDownButton = createToggleButton("down", CcAssignment.ARROW_DOWN.getCcNr(), ORANGE);
         mDownButton.setLabel("Down");
-        mLeftButton = createToggleButton("left", CcAssignment.LEFT.getCcNr(), ORANGE);
+        mLeftButton = createToggleButton("left", CcAssignment.ARROW_LEFT.getCcNr(), ORANGE);
         mLeftButton.setLabel("Left");
-        mRightButton = createToggleButton("right", CcAssignment.RIGHT.getCcNr(), ORANGE);
+        mRightButton = createToggleButton("right", CcAssignment.ARROW_RIGHT.getCcNr(), ORANGE);
         mRightButton.setLabel("Right");
+
+        mNavLeftButton = createToggleButton("navLeft", CcAssignment.LEFT.getCcNr(), ORANGE);
+        mNavLeftButton.setLabel("NavLeft");
+        mNavRightButton = createToggleButton("navRight", CcAssignment.RIGHT.getCcNr(), ORANGE);
+        mNavRightButton.setLabel("NavRight");
 
         // Mode section
         mSongButton = createToggleButton("song", CcAssignment.MODE_SONG.getCcNr(), BLUE);
@@ -544,14 +515,6 @@ public class AtomSQExtension extends ControllerExtension {
         mBaseLayer.bindToggle(mLeftButton, cursorDevice.selectPreviousAction(), cursorDevice.hasPrevious());
         mBaseLayer.bindToggle(mRightButton, cursorDevice.selectNextAction(), cursorDevice.hasNext());
 
-        // encoder
-        for (int i = 0; i < ENCODER_CC_MAPPING.length; i++) {
-            final Parameter parameter = cursorRemoteControlsPage.getParameter(i);
-            final RelativeHardwareKnob encoder = mEncoders[i];
-
-            mBaseLayer.bind(encoder, parameter);
-        }
-
 
         mBaseLayer.activate();
     }
@@ -611,10 +574,6 @@ public class AtomSQExtension extends ControllerExtension {
         AtomSQUtils.writeDisplay(7, message, midiOut);
     }
 
-    public PopupBrowser getBrowser() {
-        return browser;
-    }
-
     public MidiIn getMidiIn() {
         return midiIn;
     }
@@ -629,6 +588,10 @@ public class AtomSQExtension extends ControllerExtension {
 
     public DrumPadBank getDrumPadBank() {
         return drumPadBank;
+    }
+
+    public void writeDisplay(final int row, final String text) {
+        AtomSQUtils.writeDisplay(row, text, midiOut);
     }
 
     public void updatePadLed(final RgbButton button) {

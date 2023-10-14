@@ -21,8 +21,8 @@ public class SongLayer extends Layer {
 
         this.driver = driver;
 
-        bindPressed(this.driver.mLeftButton, this::previousMode);
-        bindPressed(this.driver.mRightButton, this::nextMode);
+        bindPressed(this.driver.mNavLeftButton, this::previousMode);
+        bindPressed(this.driver.mNavRightButton, this::nextMode);
     }
 
     @Override

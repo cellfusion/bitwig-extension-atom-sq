@@ -31,7 +31,7 @@ public class BrowserLayer extends Layer {
     public BrowserLayer(AtomSQExtension driver) {
         super(driver.getLayers(), "BROWSR_LAYER");
 
-        browser = driver.getBrowser();
+        browser = driver.browser;
         cursorDevice = driver.getCursorDevice();
         cursorTrack = driver.getCursorTrack();
         cursorDevice.exists().markInterested();
@@ -94,8 +94,24 @@ public class BrowserLayer extends Layer {
             selectedElement = v;
         });
 
+        bindPressed(driver.mDisplayButtons[0], pressed -> {
+            if (driver.getShiftDown().get()) {
+                browser.cancel();
+            } else {
+                browser.commit();
+            }
+        });
+        driver.mShiftButton.isPressed().addValueObserver(pressed -> {
+            updateDisplay();
+        });
+
         // select
         driver.bindEncoder(this, driver.getMainEncoder(), this::handleEncoder);
+    }
+
+    private void updateDisplay() {
+        driver.writeDisplay(0, driver.getShiftDown().get() ? "Cancel" : "OK");
+
     }
 
 
@@ -163,26 +179,6 @@ public class BrowserLayer extends Layer {
 
     private void browserValueChanged(boolean exists) {
         setIsActive(exists);
-    }
-
-    public void shiftPressAction(final boolean down) {
-        if (browser.exists().get()) {
-            browser.cancel();
-        } else {
-            if (cursorDevice.exists().get()) {
-                cursorDevice.replaceDeviceInsertionPoint().browse();
-            } else {
-                cursorTrack.endOfDeviceChainInsertionPoint().browse();
-            }
-        }
-    }
-
-    public void pressAction(final boolean down) {
-        if (down || !browser.exists().get()) {
-            return;
-        }
-
-        browser.commit();
     }
 
     @Override

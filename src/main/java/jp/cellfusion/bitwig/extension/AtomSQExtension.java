@@ -5,13 +5,11 @@ import com.bitwig.extension.controller.ControllerExtension;
 import com.bitwig.extension.controller.api.*;
 import com.bitwig.extensions.framework.DebugUtilities;
 import com.bitwig.extensions.framework.Layer;
+import com.bitwig.extensions.framework.LayerGroup;
 import com.bitwig.extensions.framework.Layers;
 import com.bitwig.extensions.framework.values.BooleanValueObject;
 import jp.cellfusion.bitwig.extension.buttons.RgbButton;
-import jp.cellfusion.bitwig.extension.layer.BrowserLayer;
-import jp.cellfusion.bitwig.extension.layer.DrumLayer;
-import jp.cellfusion.bitwig.extension.layer.KeyboardLayer;
-import jp.cellfusion.bitwig.extension.layer.SongLayer;
+import jp.cellfusion.bitwig.extension.layer.*;
 import jp.cellfusion.bitwig.extension.utils.LogUtil;
 
 import java.util.ArrayList;
@@ -86,6 +84,9 @@ public class AtomSQExtension extends ControllerExtension {
     private DrumLayer mDrumLayer;
     private KeyboardLayer mKeyboardLayer;
     private SongLayer mSongLayer;
+    private InstLayer mInstLayer;
+    private EditorLayer mEditorLayer;
+    private LayerGroup mModeLayerGroup;
 
 
     public Layers getLayers() {
@@ -147,9 +148,6 @@ public class AtomSQExtension extends ControllerExtension {
         midiOut = host.getMidiOutPort(0);
 
         hardwareSurface = host.createHardwareSurface();
-
-        // Turn on Native Mode
-        midiOut.sendMidi(0x8f, 0, 127);
 
         mNoteInput = midiIn.createNoteInput("Pads", getNoteInputMask());
         mNoteInput.setShouldConsumeEvents(true);
@@ -232,6 +230,9 @@ public class AtomSQExtension extends ControllerExtension {
 
         setUpHardware();
 
+        // Turn on Native Mode
+        midiOut.sendMidi(0x8f, 0, 127);
+
         mBaseLayer = new Layer(layers, "BASE");
         shiftLayer = new Layer(layers, "SHIFT");
         bindEncoder(mBaseLayer, mainEncoder, this::mainEncoderAction);
@@ -257,10 +258,6 @@ public class AtomSQExtension extends ControllerExtension {
         });
 
         initLayers();
-
-        // init display
-        AtomSQUtils.writeDisplay(6, "Bitwig Studio", midiOut);
-        AtomSQUtils.writeDisplay(7, "ATOM SQ", midiOut);
 
         // For now just show a popup notification for verification that it is running.
         host.showPopupNotification("Atom SQ Initialized");
@@ -506,8 +503,15 @@ public class AtomSQExtension extends ControllerExtension {
 
         // TODO Song/Inst/Editor/User Layer の切り替え
         mSongLayer = new SongLayer(this);
-
         mBaseLayer.bindToggle(mSongButton, mSongLayer::activate, mSongLayer::isActive);
+
+        mInstLayer = new InstLayer(this);
+        mBaseLayer.bindToggle(mInstButton, mInstLayer::activate, mInstLayer::isActive);
+
+        mEditorLayer = new EditorLayer(this);
+        mBaseLayer.bindToggle(mEditorButton, mEditorLayer::activate, mEditorLayer::isActive);
+
+        mModeLayerGroup = new LayerGroup(mSongLayer, mInstLayer, mEditorLayer);
 
         // 初期状態は Song Layer
         mSongLayer.activate();

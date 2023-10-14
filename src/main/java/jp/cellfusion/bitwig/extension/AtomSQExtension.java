@@ -11,6 +11,7 @@ import jp.cellfusion.bitwig.extension.buttons.RgbButton;
 import jp.cellfusion.bitwig.extension.layer.BrowserLayer;
 import jp.cellfusion.bitwig.extension.layer.DrumLayer;
 import jp.cellfusion.bitwig.extension.layer.KeyboardLayer;
+import jp.cellfusion.bitwig.extension.layer.SongLayer;
 import jp.cellfusion.bitwig.extension.utils.LogUtil;
 
 import java.util.ArrayList;
@@ -44,18 +45,8 @@ public class AtomSQExtension extends ControllerExtension {
     private PinnableCursorDevice cursorDevice;
     private CursorRemoteControlsPage cursorRemoteControlsPage;
     private HardwareSurface hardwareSurface;
-    private MidiIn midiIn;
-    private MidiOut midiOut;
-    private HardwareButton mShiftButton, mUpButton, mDownButton, mLeftButton, mRightButton, mClickCountInButton, mRecordSaveButton, mPlayLoopButton, mStopUndoButton, mSongButton, mInstButton, mEditorButton, mUserButton;
-    private final RelativeHardwareKnob[] mEncoders = new RelativeHardwareKnob[ENCODER_CC_MAPPING.length];
-    private final HardwareButton[] mPadButtons = new HardwareButton[PAD_CC_MAPPING.length];
-    private final HardwareButton[] mAlphabetButtons = new HardwareButton[ALPHABET_CC_MAPPING.length];
-    private final HardwareButton[] mDisplayButtons = new HardwareButton[DISPLAY_BUTTON_CC_MAPPING.length];
-    private final MultiStateHardwareLight[] mPadLights = new MultiStateHardwareLight[PAD_CC_MAPPING.length];
-    private Layers layers;
 
     private Application mApplication;
-    private Layer mBaseLayer;
     private final BooleanValueObject shiftDown = new BooleanValueObject();
     private Transport transport;
     private PinnableCursorDevice primaryDevice;
@@ -68,14 +59,33 @@ public class AtomSQExtension extends ControllerExtension {
     private int mCurrentPadForSteps;
     private SceneBank mSceneBank;
     private ControllerHost host;
-    private BrowserLayer browserLayer;
 
-    private RelativeHardwareKnob mainEncoder;
     private PopupBrowser browser;
     private DeviceBank deviceBank;
+
+    // encoder
+    private RelativeHardwareKnob mainEncoder;
+    public final RelativeHardwareKnob[] mEncoders = new RelativeHardwareKnob[ENCODER_CC_MAPPING.length];
+
+    // midi
+    public MidiIn midiIn;
+    public MidiOut midiOut;
+
+    // buttons
+    public HardwareButton mShiftButton, mUpButton, mDownButton, mLeftButton, mRightButton, mClickCountInButton, mRecordSaveButton, mPlayLoopButton, mStopUndoButton, mSongButton, mInstButton, mEditorButton, mUserButton;
+    public final HardwareButton[] mPadButtons = new HardwareButton[PAD_CC_MAPPING.length];
+    public final HardwareButton[] mAlphabetButtons = new HardwareButton[ALPHABET_CC_MAPPING.length];
+    public final HardwareButton[] mDisplayButtons = new HardwareButton[DISPLAY_BUTTON_CC_MAPPING.length];
+    public final MultiStateHardwareLight[] mPadLights = new MultiStateHardwareLight[PAD_CC_MAPPING.length];
+
+    // layers
+    public Layers layers;
+    private Layer mBaseLayer;
+    private BrowserLayer browserLayer;
     private Layer shiftLayer;
     private DrumLayer mDrumLayer;
     private KeyboardLayer mKeyboardLayer;
+    private SongLayer mSongLayer;
 
 
     public Layers getLayers() {
@@ -494,6 +504,14 @@ public class AtomSQExtension extends ControllerExtension {
     private void initLayers() {
         initBaseLayer();
 
+        // TODO Song/Inst/Editor/User Layer の切り替え
+        mSongLayer = new SongLayer(this);
+
+        mBaseLayer.bindToggle(mSongButton, mSongLayer::activate, mSongLayer::isActive);
+
+        // 初期状態は Song Layer
+        mSongLayer.activate();
+
         DebugUtilities.createDebugLayer(layers, hardwareSurface).activate();
     }
 
@@ -595,6 +613,10 @@ public class AtomSQExtension extends ControllerExtension {
 
     public MidiIn getMidiIn() {
         return midiIn;
+    }
+
+    public MidiOut getMidiOut() {
+        return midiOut;
     }
 
     public HardwareSurface getSurface() {

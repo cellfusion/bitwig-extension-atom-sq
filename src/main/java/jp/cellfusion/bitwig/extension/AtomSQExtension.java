@@ -48,7 +48,7 @@ public class AtomSQExtension extends ControllerExtension {
 
     private Application mApplication;
     private final BooleanValueObject shiftDown = new BooleanValueObject();
-    private Transport transport;
+    public Transport transport;
     private PinnableCursorDevice primaryDevice;
     private NoteInput mNoteInput;
     private PlayingNote[] mPlayingNotes;
@@ -147,6 +147,9 @@ public class AtomSQExtension extends ControllerExtension {
         midiOut = host.getMidiOutPort(0);
 
         hardwareSurface = host.createHardwareSurface();
+
+        // Turn on Native Mode
+        midiOut.sendMidi(0x8f, 0, 127);
 
         mNoteInput = midiIn.createNoteInput("Pads", getNoteInputMask());
         mNoteInput.setShouldConsumeEvents(true);
@@ -254,9 +257,6 @@ public class AtomSQExtension extends ControllerExtension {
         });
 
         initLayers();
-
-        // Turn on Native Mode
-        midiOut.sendMidi(0x8f, 0, 127);
 
         // init display
         AtomSQUtils.writeDisplay(6, "Bitwig Studio", midiOut);
